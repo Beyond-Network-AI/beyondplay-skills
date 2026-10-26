@@ -1,9 +1,12 @@
 name: check
 
+# When it runs: on a release tag and by hand, not on every push. The kit's
+# ladder is what a contributor runs locally before pushing.
+#   gh workflow run check.yml
+#   git tag v0.1.0 && git push origin v0.1.0
 on:
   push:
-    branches: [main]
-  pull_request:
+    tags: ["v*"]
   workflow_dispatch:
 
 # No marketplace actions: the runner's own git and Node do the work, so the
