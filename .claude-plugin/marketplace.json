@@ -1,0 +1,21 @@
+{
+  "name": "beyondplay",
+  "owner": {
+    "name": "BeyondPlay",
+    "url": "https://beyondplay.xyz"
+  },
+  "metadata": {
+    "description": "Skills for building games and worlds on BeyondPlay, the mobile-first social arcade.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "beyondplay-game",
+      "source": "./",
+      "description": "Build, check and submit a BeyondPlay mini-game with the creator MCP.",
+      "version": "0.1.0",
+      "category": "development",
+      "keywords": ["beyondplay", "game", "mobile", "arcade", "mcp"]
+    }
+  ]
+}

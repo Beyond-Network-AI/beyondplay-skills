@@ -1,0 +1,12 @@
+/* Minimal reset for harness games (the sandbox template uses Tailwind; harness
+   games style themselves — keep only the shell-critical bits). */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+body {
+  background: #09090b;
+  color: #f4f4f5;
+  font-family: 'Geist', system-ui, -apple-system, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}

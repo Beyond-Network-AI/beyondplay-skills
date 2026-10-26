@@ -1,0 +1,9 @@
+node_modules/
+dist/
+out/
+*.log
+.playwright/
+test-results/
+.DS_Store
+.env
+.claude/settings.local.json

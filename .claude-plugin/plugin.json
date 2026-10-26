@@ -1,0 +1,20 @@
+{
+  "name": "beyondplay-game",
+  "version": "0.1.0",
+  "description": "Build, check and submit a BeyondPlay mini-game: the platform contract, the starter game, the validator and the checks, and the creator MCP path.",
+  "author": {
+    "name": "BeyondPlay",
+    "url": "https://beyondplay.xyz"
+  },
+  "homepage": "https://github.com/Beyond-Network-AI/beyondplay-skills",
+  "repository": "https://github.com/Beyond-Network-AI/beyondplay-skills",
+  "license": "MIT",
+  "keywords": ["beyondplay", "game", "mobile", "arcade", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": {
+    "beyondplay": {
+      "type": "http",
+      "url": "https://app.beyondplay.xyz/api/mcp"
+    }
+  }
+}

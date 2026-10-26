@@ -1,0 +1,17 @@
+{
+  "name": "beyondplay-check",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Validator for BeyondPlay games: the local companion of the hosted check the creator MCP runs. Dependencies are installed by the kit's root package.json.",
+  "type": "module",
+  "bin": {
+    "beyondplay-check": "./bin/beyondplay-check.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "node ./bin/beyondplay-check.mjs",
+    "test": "vitest run"
+  }
+}

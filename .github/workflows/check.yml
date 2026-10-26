@@ -1,0 +1,29 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  kit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Validator tests
+        run: npm test
+      - name: Scaffold the starter game
+        run: npm run new-game -- ci-game "CI Game"
+      - name: Render the art
+        run: npm run render-icon -- games/ci-game && npm run render-banner -- games/ci-game
+      - name: The ladder
+        run: npm run ladder -- games/ci-game
+      - name: Pack for upload
+        run: npm run pack -- games/ci-game
