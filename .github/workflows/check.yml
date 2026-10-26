@@ -6,18 +6,25 @@ on:
   pull_request:
   workflow_dispatch:
 
+# No marketplace actions: the runner's own git and Node do the work, so the
+# workflow runs under any organisation policy on allowed actions.
 jobs:
   kit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Check out the commit
+        run: |
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --depth 1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
+      - name: Node and npm versions
+        run: node --version && npm --version
+      - name: Install
+        run: npm ci
+      - name: Browser for the checks
+        run: npx playwright install --with-deps chromium
       - name: Validator tests
         run: npm test
       - name: Scaffold the starter game
