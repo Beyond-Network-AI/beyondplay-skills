@@ -9,12 +9,20 @@
   "homepage": "https://github.com/Beyond-Network-AI/beyondplay-skills",
   "repository": "https://github.com/Beyond-Network-AI/beyondplay-skills",
   "license": "MIT",
-  "keywords": ["beyondplay", "game", "mobile", "arcade", "mcp"],
+  "keywords": [
+    "beyondplay",
+    "game",
+    "mobile",
+    "arcade",
+    "mcp"
+  ],
   "skills": "./skills/",
   "mcpServers": {
     "beyondplay": {
       "type": "http",
       "url": "https://app.beyondplay.xyz/api/mcp"
     }
-  }
+  },
+  "icon": "./.claude-plugin/icon.png",
+  "privacyPolicyUrl": "https://www.beyondplay.xyz/privacy"
 }
