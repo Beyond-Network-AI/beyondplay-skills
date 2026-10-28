@@ -51,6 +51,18 @@ packs it, and takes it through the MCP: upload, hosted build and checks, listing
 and icon, publish unlisted (playable by link), submit for review. A reviewer approves,
 and the game is listed.
 
+## Any model as the agent
+
+```bash
+npm run mcp login                                              # once: sign in through the browser
+XAI_API_KEY=... npm run agent -- "a one-thumb game about catching falling fruit"
+```
+
+`npm run agent` drives any OpenAI-compatible model (xAI's Grok by default) through
+the whole path above, with the kit's scripts and the creator MCP as its tools, and ends
+with an unlisted publish. `docs/AGENT.md` has the flags (`--offline`, `--no-publish`,
+`--steps`, `--model`, `--base-url`).
+
 ## The rules in one breath
 
 One config file (`src/beyondplay.config.ts`). Portrait, one thumb, 30 to 90 second
