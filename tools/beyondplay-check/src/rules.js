@@ -65,19 +65,23 @@ const BY_CODE = new Map(RULES.map((r) => [r.code, r]));
  * The capabilities a game may ask the platform for through
  * src/beyondplay-platform.ts (request(name, params)). The host answers; the
  * game never gates play on an answer and never feeds one into the seeded
- * simulation. Tiers: open (answered without asking the player), consent (the
- * player is asked once per game and can revoke), platform (the platform runs
- * it; the game only reports). Phase 1 ships the open ones; later phases add
- * entries here without changing the door.
+ * simulation. A game runs inside the platform with no network of its own, so
+ * what it is handed stays on the platform's screens; the listing discloses
+ * what a game uses (the manifest's `uses`), and the platform can switch a
+ * capability off for one game. Tiers: open (answered without asking the
+ * player; everything offered today), platform (the platform runs it; the game
+ * only reports), consent (reserved: only for something that would leave the
+ * platform or identify the account, which nothing offered does). Later phases
+ * add entries here without changing the door.
  */
 export const CAPABILITIES = [
   { name: 'capabilities', tier: 'open', since: '2026-11-02', phase: 1, returns: 'string[]: the names this host offers.', note: 'Also on window.BeyondPlay.capabilities once the host has said hello.' },
   { name: 'host', tier: 'open', since: '2026-11-02', phase: 1, returns: '{ surface, locale, reducedMotion, authenticated, apiVersion }.', note: 'surface is feed, page, app, telegram, desktop or unknown.' },
   { name: 'player.profile', tier: 'open', since: '2026-11-02', phase: 1, returns: '{ displayName, handle, avatar } or null when the player is signed out.', note: 'Never an email, a wallet or an id. For a greeting or a name on the end card; scores still post through challenge.submit.' },
   { name: 'share', tier: 'open', since: '2026-11-02', phase: 1, params: '{ score?, text? }', returns: '{ outcome: "shared" | "copied" }; rejects with cancelled when the player dismisses the sheet.', note: 'The host opens its own share sheet with the game page and the score card; the game shows no card and writes no clipboard of its own.' },
-  { name: 'player.items', tier: 'consent', since: null, phase: 2, returns: 'Cosmetic items the player owns, for a skin or a trail; nothing unlocks play.', note: 'Not yet offered; the host answers unsupported.' },
-  { name: 'player.stats', tier: 'consent', since: null, phase: 2, returns: 'The player\'s best score and plays in this game.', note: 'Not yet offered.' },
-  { name: 'player.friends', tier: 'consent', since: null, phase: 2, returns: 'Display names of friends who played this game, for a ghost or a target.', note: 'Not yet offered.' },
+  { name: 'player.items', tier: 'open', since: null, phase: 2, returns: 'Cosmetic items the player owns, as item ids and images from the platform\'s inventory, for a skin or a trail; nothing unlocks play and no wallet is read.', note: 'Not yet offered; the host answers unsupported.' },
+  { name: 'player.stats', tier: 'open', since: null, phase: 2, returns: 'The player\'s best score and plays in this game, for a beat-your-best or a returning-player greeting.', note: 'Not yet offered.' },
+  { name: 'player.friends', tier: 'open', since: null, phase: 2, returns: 'Display names and best scores of friends who played this game, for a ghost or a target; what the leaderboard already shows.', note: 'Not yet offered.' },
   { name: 'platform.season', tier: 'platform', since: null, phase: 3, returns: 'The current season and the player\'s standing.', note: 'Not yet offered.' },
 ];
 

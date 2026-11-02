@@ -316,11 +316,16 @@ does not list.
 | `player.profile` | open | | `{ displayName, handle, avatar }`, or `null` when signed out. Never an email, a wallet or an id. |
 | `share` | open | `{ score?, text? }` | `{ outcome: 'shared' \| 'copied' }`. The host opens its own share sheet with the game page and the score card; rejects with `cancelled` when the player dismisses it. |
 
-Tiers: `open` is answered without asking the player; `consent` (a later
-phase: `player.items`, `player.stats`, `player.friends`) asks the player once
-per game and can be revoked; `platform` (`platform.season`) is run by the
-platform, the game only reports. Names not yet offered answer `unsupported`.
-`get_contract` on the creator MCP serves the live table.
+Tiers: `open` is answered without asking the player, which covers
+everything offered and planned (`player.items`, `player.stats`,
+`player.friends` follow in a later phase); `platform` (`platform.season`) is
+run by the platform, the game only reports; `consent` is reserved for
+something that would leave the platform or identify the account, which
+nothing offered does. A game runs inside the platform with no network of its
+own, so what it is handed stays on the platform's screens; the listing
+discloses what a game uses, and the platform can switch a capability off for
+one game. Names not yet offered answer `unsupported`. `get_contract` on the
+creator MCP serves the live table.
 
 The starter game shows the pattern: a Share control on the end card, rendered
 only when `can('share')`, calling `request('share', { score })` and ignoring
