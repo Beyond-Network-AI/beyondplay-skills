@@ -148,4 +148,31 @@ describe('beyondplay-check game', () => {
     expect(issue(r, 'GAME_BUNDLE_MANIFEST_INVALID').message).toMatch(/FALLBACK/);
     expect(codes(r).filter((c) => c === 'GAME_BUNDLE_SHELL_MISSING')).toHaveLength(2);
   });
+  it('records the capabilities a game requests, and the template declares share and uses it through request()', async () => {
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.facts.uses).toEqual(['share']);
+    expect(codes(r)).not.toContain('GAME_SHARE_BUTTON');
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(r.ok).toBe(true);
+  });
+
+  it('flags an undeclared or unknown capability as a listing finding, and a share intent of the game\'s own beside request()', async () => {
+    append(join(dir, 'src/App.tsx'), "const who = await request('player.profile'); const t = await request('player.wallet');");
+    append(join(dir, 'src/App.tsx'), "const tweet = () => window.open('https://x.com/intent/tweet?text=hi');");
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.facts.uses).toEqual(['player.profile', 'player.wallet', 'share']);
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED')).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/App.tsx' });
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED').message).toContain("request('player.profile')");
+    expect(issue(r, 'GAME_CAPABILITY_UNKNOWN')).toMatchObject({ severity: 'error', tier: 'listing' });
+    expect(issue(r, 'GAME_SHARE_BUTTON')).toMatchObject({ severity: 'warning', tier: 'listing' });
+  });
+
+  it('a config without uses still passes when the game requests nothing; skipConfig checks only the names', async () => {
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), "import { defineSoloGame } from './beyondplay-kit';\nexport const game = defineSoloGame({});\n");
+    const r = await checkGame(dir, { template: TEMPLATE, skipConfig: true });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(r.facts.uses).toEqual(['share']);
+    const full = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(full, 'GAME_CAPABILITY_UNDECLARED')).toMatchObject({ path: 'src/App.tsx' });
+  });
 });

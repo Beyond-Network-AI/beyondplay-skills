@@ -227,9 +227,13 @@ Breaking any of these ships a broken game or a rejected one.
 - No network calls except the platform's own. No CDNs, no ads, no fonts beyond
   the template's, no localStorage abuse. Strip them when porting.
 - A game never asks for a name, an email or any identity: the player is signed
-  in. A game never links out (no marketplaces, no social sites) and shows no
-  share button; the game page around the game carries the platform's share
-  and links.
+  in; `request('player.profile')` from `src/beyondplay-platform.ts` gives the
+  display name and avatar for a greeting. A game never links out (no
+  marketplaces, no social sites) and never shares on its own (no X cards, no
+  clipboard writes); a share control may only call `request('share', { score })`,
+  which opens the platform's sheet. Declare every capability the game requests
+  in `uses` on `defineSoloGame`, and show such a control only when
+  `can(name)` is true (`references/contract.md` section 9).
 - Rewards, currencies and unlocks inside a game are cosmetic and local; no
   purchase, earnings or token language. Seasons, prizes and tokens are the
   platform's: ask for them, never build them in.
@@ -287,7 +291,7 @@ Breaking any of these ships a broken game or a rejected one.
 
 ## References
 
-- `references/contract.md`: config fields, manifest fields, the `window.BeyondPlay` SDK, messages, URL parameters, build config, `publish.config.json`.
+- `references/contract.md`: config fields, manifest fields, the `window.BeyondPlay` SDK, messages, URL parameters, build config, `publish.config.json`, the capabilities a game may request.
 - `references/mobile-rules.md`: touch, viewport, the feed contract, preboot hold, performance, haptics, known iOS and CSP traps.
 - `references/smoke-ladder.md`: the static validator, the checks, what each asserts, how to read a failure.
 - `references/assets-and-audio.md`: free libraries, procedural audio, the music and licence rule, 3D pipeline notes.

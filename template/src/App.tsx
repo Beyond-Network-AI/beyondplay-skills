@@ -3,6 +3,7 @@ import { TapTimingGame, DESIGN_W, DESIGN_H, DT, ROUNDS, ROUND_STEPS } from './ga
 import { challenge } from './beyondplay.config';
 import { getMatch } from './beyondplay-kit';
 import { haptic } from './haptics';
+import { can, onCapabilities, request } from './beyondplay-platform';
 
 // The shell: one canvas, a HUD, an end card. It converts real time into whole
 // engine steps and draws; it never decides gameplay. Replace the drawing and
@@ -19,6 +20,10 @@ export default function App() {
   const [score, setScore] = useState(0);
   const [round, setRound] = useState(0);
   const [over, setOver] = useState<null | { score: number; hits: number; perfects: number }>(null);
+  // The platform's share: shown only where the host offers it (the feed, the game page);
+  // the host opens its own sheet with the game's card. Never a card or a link of our own.
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => onCapabilities(() => setCanShare(can('share'))), []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -208,6 +213,14 @@ export default function App() {
             >
               Play again
             </button>
+            {canShare && (
+              <button
+                onPointerUp={() => { request('share', { score: over.score }).catch(() => { /* dismissed, or not offered here */ }); }}
+                style={{ display: 'block', margin: '12px auto 0', padding: '10px 22px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: FONT, touchAction: 'manipulation' }}
+              >
+                Share
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -45,7 +45,9 @@ server; each asks you to sign in the first time.
 The archive: `npm run pack -- games/<slug>` writes `out/<slug>.tar.gz` with `src/`,
 `public/`, `smoke.driver.mjs`, `CREDITS.md` and `publish.config.json`, and nothing else.
 The platform keeps its own copies of the platform-owned files (`src/main.tsx`,
-`src/beyondplay-kit.ts`) and notes it in the report.
+`src/beyondplay-kit.ts`) and notes it in the report. `src/beyondplay-platform.ts`
+travels with the game; the report records the capabilities the game requests
+(`facts.uses`), and `get_contract` serves the capability table.
 
 Limits: 50 MB and 1,500 files per archive, 10 MB per file; one build at a time, 50 a
 day, 10 in five minutes; 60 requests a minute.

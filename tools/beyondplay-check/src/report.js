@@ -1,6 +1,6 @@
 // Issue collection and the two output shapes: the JSON object and the readable report.
 //
-// JSON: { ok, target, counts: { error, warning, info }, issues: [{ code, severity, path, line?, message, remediation, docs? }] }
+// JSON: { ok, target, counts: { error, warning, info }, issues: [{ code, severity, path, line?, message, remediation, docs? }], facts: { uses?: string[] } }
 // Codes are stable UPPER_SNAKE identifiers; `ok` is true when nothing at or above the fail level was found.
 
 import { tierOf } from './rules.js';
@@ -12,6 +12,7 @@ export const SEVERITIES = Object.keys(ORDER);
 
 export function createReport(target) {
   const issues = [];
+  const facts = {};
   const add = (severity, code, path, message, remediation, extra = {}) => {
     if (!CODE.test(code)) throw new Error(`issue code is not UPPER_SNAKE: ${code}`);
     const issue = { code, severity, tier: tierOf(code), path: String(path ?? '.').split('\\').join('/'), message, remediation };
@@ -25,13 +26,15 @@ export function createReport(target) {
     warning: (code, path, message, remediation, extra) => add('warning', code, path, message, remediation, extra),
     info: (code, path, message, remediation, extra) => add('info', code, path, message, remediation, extra),
     has: (code) => issues.some((i) => i.code === code),
+    /** Record something the check learned that is not a finding (the capabilities a game asks for, say). */
+    fact: (key, value) => { facts[key] = value; },
     finish(failLevel = 'error') {
       const sorted = [...issues].sort(
         (a, b) => ORDER[a.severity] - ORDER[b.severity] || a.code.localeCompare(b.code) || a.path.localeCompare(b.path) || (a.line ?? 0) - (b.line ?? 0),
       );
       const counts = { error: 0, warning: 0, info: 0 };
       for (const i of sorted) counts[i.severity] += 1;
-      return { ok: !fails({ counts }, failLevel), target, counts, issues: sorted };
+      return { ok: !fails({ counts }, failLevel), target, counts, issues: sorted, facts: { ...facts } };
     },
   };
 }

@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { checkSizeLimits, walk } from './files.js';
 import { checkBundle } from './game-bundle.js';
 import { checkConfig } from './game-config.js';
-import { checkArt, checkAudioLicence, checkPublishConfig, checkSmokeDriver, scanSource } from './game-scan.js';
+import { checkArt, checkAudioLicence, checkCapabilities, checkPublishConfig, checkSmokeDriver, scanSource } from './game-scan.js';
 import { checkTemplate, resolveTemplateDir } from './game-template.js';
 import { GAME_SOURCE } from './limits.js';
 import { createReport } from './report.js';
@@ -24,6 +24,7 @@ export async function checkGame(dirArg, opts = {}) {
   checkArt(dir, report);
   checkSmokeDriver(dir, report);
   scanSource(dir, files, templateOwned, report);
+  checkCapabilities(files, templateOwned, manifest, report);
   checkAudioLicence(dir, files, report);
   if (!opts.skipConfig) checkBundle(dir, manifest, report);
   return report.finish(opts.failLevel);

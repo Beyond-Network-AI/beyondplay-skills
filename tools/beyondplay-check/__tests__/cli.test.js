@@ -25,11 +25,11 @@ describe('beyondplay-check CLI', () => {
   });
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-  it('--json prints exactly { ok, target, counts, issues } and exits 0 on a pass', () => {
+  it('--json prints exactly { ok, target, counts, issues, facts } and exits 0 on a pass', () => {
     const r = run('game', passing, '--json', '--template', TEMPLATE);
     expect(r.status).toBe(0);
     const out = r.json();
-    expect(Object.keys(out)).toEqual(['ok', 'target', 'counts', 'issues']);
+    expect(Object.keys(out)).toEqual(['ok', 'target', 'counts', 'issues', 'facts']);
     expect(out.ok).toBe(true);
     expect(out.target).toMatchObject({ kind: 'game', dir: passing });
     expect(Object.keys(out.counts)).toEqual(['error', 'warning', 'info']);

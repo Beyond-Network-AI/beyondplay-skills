@@ -25,11 +25,13 @@ export const RULES = [
   { code: 'GAME_SOURCE_FILE_TOO_LARGE', tier: 'publish', rule: 'At most 10 MB per file.' },
   { code: 'GAME_PUBLISH_CONFIG_INVALID', tier: 'publish', rule: 'publish.config.json is valid JSON with a slug and a name.' },
   // ── identity, network, money ─────────────────────────────────────────────
-  { code: 'GAME_WALLET_GATING', tier: 'publish', rule: 'No wallet connection and no token or NFT gating in a game; the platform owns identity.', instead: 'Cosmetic use of owned items is fine when the platform hands them over; nothing is unlocked by holding an asset.' },
+  { code: 'GAME_WALLET_GATING', tier: 'publish', rule: 'No wallet connection and no token or NFT gating in a game; the platform owns identity.', instead: 'Cosmetic use of owned items is fine when the platform hands them over (request(\'player.items\'), a later phase); nothing is unlocked by holding an asset.' },
   { code: 'GAME_EXTERNAL_REQUEST', tier: 'publish', rule: 'No network calls beyond the platform\'s own hosts: no CDNs, fonts, APIs or analytics.', instead: 'Bundle the asset or data with the game.' },
   { code: 'GAME_EXTERNAL_LINK', tier: 'publish', rule: 'No links out of a game: no marketplaces, social sites or external pages.', instead: 'The game page around the game carries the platform\'s links; a game shows nothing that leaves it.' },
-  { code: 'GAME_NAME_PROMPT', tier: 'publish', rule: 'A game never asks the player for a name, an email or any identity; the player is signed in to the platform.', instead: 'The shell knows the player; scores post to their account through challenge.submit.' },
-  { code: 'GAME_SHARE_BUTTON', tier: 'listing', rule: 'No share buttons, share intents or clipboard writes inside a game.', instead: 'The game page and the feed carry the platform\'s share, with the game\'s own card and image.' },
+  { code: 'GAME_NAME_PROMPT', tier: 'publish', rule: 'A game never asks the player for a name, an email or any identity; the player is signed in to the platform.', instead: 'The shell knows the player: request(\'player.profile\') from src/beyondplay-platform.ts returns their display name and avatar when they allow it; scores post to their account through challenge.submit.' },
+  { code: 'GAME_SHARE_BUTTON', tier: 'listing', rule: 'No share intents, social cards or clipboard writes of the game\'s own; a share control may only call request(\'share\'), which opens the platform\'s sheet with the game\'s card.', instead: 'request(\'share\', { score }) from src/beyondplay-platform.ts, with uses: [\'share\'] declared in the config; the platform shares the game page with its own card and rewards sharing itself.' },
+  { code: 'GAME_CAPABILITY_UNKNOWN', tier: 'listing', rule: 'A game asks the platform only for the capabilities the contract lists (CAPABILITIES below); the host answers anything else as unsupported.', instead: 'Use a listed name; get_contract on the creator MCP serves the live table with what each returns.' },
+  { code: 'GAME_CAPABILITY_UNDECLARED', tier: 'listing', rule: 'Every capability a game requests is declared in uses (defineSoloGame({ uses }) or declareUses), so the reviewer and the player see what the game asks for.', instead: 'Add the name to uses in src/beyondplay.config.ts.' },
   { code: 'GAME_DIRECT_LEADERBOARD', tier: 'listing', rule: 'The duel board is scored only through challenge.submit; reading a board for display is fine.' },
   // ── the feed ─────────────────────────────────────────────────────────────
   { code: 'GAME_START_GATE', tier: 'listing', rule: 'The feed card is already playing when it scrolls in: no title screen, no Play or Start button, no splash, no "created by" card, no picker before play.', instead: 'Boot straight into a run; put the restart on the end card and any picker behind a small settings control or after game over.' },
@@ -58,6 +60,31 @@ export const RULES = [
 ];
 
 const BY_CODE = new Map(RULES.map((r) => [r.code, r]));
+
+/**
+ * The capabilities a game may ask the platform for through
+ * src/beyondplay-platform.ts (request(name, params)). The host answers; the
+ * game never gates play on an answer and never feeds one into the seeded
+ * simulation. Tiers: open (answered without asking the player), consent (the
+ * player is asked once per game and can revoke), platform (the platform runs
+ * it; the game only reports). Phase 1 ships the open ones; later phases add
+ * entries here without changing the door.
+ */
+export const CAPABILITIES = [
+  { name: 'capabilities', tier: 'open', since: '2026-11-02', phase: 1, returns: 'string[]: the names this host offers.', note: 'Also on window.BeyondPlay.capabilities once the host has said hello.' },
+  { name: 'host', tier: 'open', since: '2026-11-02', phase: 1, returns: '{ surface, locale, reducedMotion, authenticated, apiVersion }.', note: 'surface is feed, page, app, telegram, desktop or unknown.' },
+  { name: 'player.profile', tier: 'open', since: '2026-11-02', phase: 1, returns: '{ displayName, handle, avatar } or null when the player is signed out.', note: 'Never an email, a wallet or an id. For a greeting or a name on the end card; scores still post through challenge.submit.' },
+  { name: 'share', tier: 'open', since: '2026-11-02', phase: 1, params: '{ score?, text? }', returns: '{ outcome: "shared" | "copied" }; rejects with cancelled when the player dismisses the sheet.', note: 'The host opens its own share sheet with the game page and the score card; the game shows no card and writes no clipboard of its own.' },
+  { name: 'player.items', tier: 'consent', since: null, phase: 2, returns: 'Cosmetic items the player owns, for a skin or a trail; nothing unlocks play.', note: 'Not yet offered; the host answers unsupported.' },
+  { name: 'player.stats', tier: 'consent', since: null, phase: 2, returns: 'The player\'s best score and plays in this game.', note: 'Not yet offered.' },
+  { name: 'player.friends', tier: 'consent', since: null, phase: 2, returns: 'Display names of friends who played this game, for a ghost or a target.', note: 'Not yet offered.' },
+  { name: 'platform.season', tier: 'platform', since: null, phase: 3, returns: 'The current season and the player\'s standing.', note: 'Not yet offered.' },
+];
+
+export const CAPABILITY_NAMES = CAPABILITIES.map((c) => c.name);
+/** The capabilities a host answers today (phase 1). */
+export const OFFERED_CAPABILITIES = CAPABILITIES.filter((c) => c.since).map((c) => c.name);
+export const capabilityFor = (name) => CAPABILITIES.find((c) => c.name === name) ?? null;
 export const ruleFor = (code) => BY_CODE.get(code) ?? null;
 export const tierOf = (code) => BY_CODE.get(code)?.tier ?? 'publish';
 
@@ -70,8 +97,8 @@ export const tierOf = (code) => BY_CODE.get(code)?.tier ?? 'publish';
 export const CONCEPT_RULES = [
   { id: 'title_screen', match: /\b(?:title|splash|intro|start|landing) ?(?:screen|page|card|menu)\b|\bplay button\b|\btap to start\b|\bmain menu\b|\bcreated by\b/i, allowed: false, code: 'GAME_START_GATE', verdict: 'No title screen, splash or Play button: the feed card is already playing when it scrolls in.', instead: 'Boot straight into a run; restart lives on the end card.' },
   { id: 'character_picker', match: /\b(?:character|bull|hero|avatar|skin|outfit|wardrobe) ?(?:select(?:or|ion)?|picker|chooser|roster)\b|\b(?:choose|pick|select) (?:your|a) (?:character|bull|hero|avatar|skin)\b|\bwardrobe\b/i, allowed: 'conditional', code: 'GAME_START_GATE', verdict: 'A picker is fine after game over or behind a small settings control, never before the first run.', instead: 'Start with a default; let the player change it on the end card.' },
-  { id: 'name_entry', match: /\b(?:enter|type|ask(?:s|ing)? for|input) (?:your |their |a |the )?(?:name|nickname|username|email)\b|\bplayer name\b|\bname entry\b|\bleaderboard name\b/i, allowed: false, code: 'GAME_NAME_PROMPT', verdict: 'A game never asks for a name or any identity; the player is signed in.', instead: 'Scores post to the signed-in account through challenge.submit.' },
-  { id: 'share', match: /\bshare\b|\btweet\b|\bpost (?:to|on) x\b|\btwitter\b|\bsocial (?:card|post|button)\b|\bclipboard\b/i, allowed: false, code: 'GAME_SHARE_BUTTON', verdict: 'No share buttons or share intents inside a game.', instead: 'The game page and the feed carry the platform\'s share with the game\'s own card; rewards for sharing are the platform\'s.' },
+  { id: 'name_entry', match: /\b(?:enter|type|ask(?:s|ing)? for|input) (?:your |their |a |the )?(?:name|nickname|username|email)\b|\bplayer name\b|\bname entry\b|\bleaderboard name\b/i, allowed: false, code: 'GAME_NAME_PROMPT', verdict: 'A game never asks for a name or any identity; the player is signed in.', instead: 'Scores post to the signed-in account through challenge.submit; request(\'player.profile\') gives the display name and avatar for a greeting or the end card.' },
+  { id: 'share', match: /\bshare\b|\btweet\b|\bpost (?:to|on) x\b|\btwitter\b|\bsocial (?:card|post|button)\b|\bclipboard\b/i, allowed: 'conditional', code: 'GAME_SHARE_BUTTON', verdict: 'A share control is fine when it only calls request(\'share\'): the platform opens its own sheet with the game\'s card. No share intents, X cards or clipboard writes of the game\'s own.', instead: 'request(\'share\', { score }) from src/beyondplay-platform.ts with uses: [\'share\'] declared; rewards for sharing are the platform\'s.' },
   { id: 'external_link', match: /\bopensea\b|\bmarketplace link\b|\blink (?:out|to) (?:a |the )?(?:website|site|page|store|marketplace|discord|telegram)\b|\bexternal link\b|\bopen (?:in )?(?:a )?(?:browser|new tab)\b/i, allowed: false, code: 'GAME_EXTERNAL_LINK', verdict: 'No links out of a game, including marketplaces and social sites.', instead: 'Links belong on the game page around the game.' },
   { id: 'wallet', match: /\bwallet\b|\bnft\b|\btoken[- ]?gat/i, allowed: 'conditional', code: 'GAME_WALLET_GATING', verdict: 'No wallet connection and nothing unlocked by holding an asset; cosmetic use of items the platform hands over is fine.', instead: 'The platform owns identity and wallets; ask for the player\'s items through the shell when that lands.' },
   { id: 'crypto_rewards', match: /\$bull\b|\btoken rewards?\b|\bearn (?:tokens|crypto|money)\b|\bpayout\b|\bcash ?out\b|\bbuy\b.*\b(?:gems|coins)\b|\bin-app purchase\b|\biap\b/i, allowed: false, code: 'GAME_DAILY_REWARD', verdict: 'No earnings, purchase or token language inside a game.', instead: 'Seasons, prizes and tokens are run by the platform; the game reports a score.' },
@@ -110,7 +137,7 @@ export function checkConcept({ description = '', features = [] } = {}) {
       'Boots straight into play; an untouched run is still playing at 12 seconds.',
       'Same seed plus same inputs reproduce the same run (duels).',
       'One challenge.submit(score) or game.endRun(score) per run; the test hook under ?bp_test=1; a smoke.driver.mjs.',
-      'No network beyond the platform, no links out, no wallet, no identity prompts, no share buttons.',
+      'No network beyond the platform, no links out, no wallet, no identity prompts; share and the player\'s profile come through request() from src/beyondplay-platform.ts, declared in uses.',
       'A 512 x 512 icon; every asset and track credited in CREDITS.md.',
     ],
   };

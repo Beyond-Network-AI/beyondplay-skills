@@ -62,6 +62,120 @@
     }
   } catch (e) { /* never break the game over a seed problem */ }
 })();</script>
+<!-- The capability bridge (mirrors arcade lib/create/bridge-bootstrap.ts BRIDGE_BOOTSTRAP_JS,
+     which the platform injects into every published game BEFORE the bundle): window.BeyondPlay.request,
+     capabilities, can and onCapabilities, answered by the host over the bridge protocol. Keep
+     byte-identical to the platform's. -->
+<script data-bp-bridge>(function(){
+  try {
+    var CHANNEL = 'beyondplay-bridge';
+    var VERSION = 1;
+    var API_VERSION = 1;
+    var TIMEOUT_MS = 10000;
+    var caps = [];
+    var heard = false;
+    var pending = {};
+    var seq = 0;
+    var listeners = [];
+    var current = null;
+    var framed = false;
+    try { framed = !!window.parent && window.parent !== window; } catch (e0) { framed = true; }
+    function fail(code, message, reason) {
+      var err = new Error(message || code);
+      err.code = code;
+      if (reason) err.reason = reason;
+      return err;
+    }
+    function nextId() { seq += 1; return 'bp-' + Date.now().toString(36) + '-' + seq; }
+    function appShell() {
+      try { return window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function' ? window.ReactNativeWebView : null; } catch (e1) { return null; }
+    }
+    function send(message) {
+      if (framed) { window.parent.postMessage(message, '*'); return true; }
+      var shell = appShell();
+      if (shell && heard) { shell.postMessage(JSON.stringify(message)); return true; }
+      return false;
+    }
+    function request(name, params) {
+      return new Promise(function (resolve, reject) {
+        if (typeof name !== 'string' || !name) { reject(fail('unsupported', 'request(name) needs a capability name')); return; }
+        if (!framed && !(appShell() && heard)) { reject(fail('unavailable', 'no BeyondPlay host answers here', 'no_host')); return; }
+        var requestId = nextId();
+        var timer = setTimeout(function () {
+          delete pending[requestId];
+          reject(fail('unavailable', 'the host did not answer ' + name + ' within ' + TIMEOUT_MS + ' ms', 'timeout'));
+        }, TIMEOUT_MS);
+        pending[requestId] = { resolve: resolve, reject: reject, timer: timer, name: name };
+        var payload = params && typeof params === 'object' ? params : {};
+        var sent = false;
+        try { sent = send({ channel: CHANNEL, version: VERSION, kind: 'request', requestId: requestId, action: name, payload: payload }); } catch (e2) { sent = false; }
+        if (!sent) {
+          clearTimeout(timer);
+          delete pending[requestId];
+          reject(fail('unavailable', 'could not reach the host', 'no_host'));
+        }
+      });
+    }
+    function settle(msg) {
+      var p = pending[msg.requestId];
+      if (!p) return;
+      clearTimeout(p.timer);
+      delete pending[msg.requestId];
+      var status = msg.status;
+      if (status === 'ok') { p.resolve(msg.result === undefined ? null : msg.result); return; }
+      var code = status === 'requires_auth' ? 'denied' : status === 'cancelled' ? 'cancelled' : status === 'unsupported' ? 'unsupported' : 'unavailable';
+      var fallback = status === 'requires_auth' ? 'the player is signed out' : status === 'cancelled' ? 'the player dismissed it' : status === 'unsupported' ? p.name + ' is not offered here' : p.name + ' failed';
+      var message = msg.error && typeof msg.error.message === 'string' ? msg.error.message : fallback;
+      var reason = msg.error && typeof msg.error.code === 'string' ? msg.error.code : (status === 'requires_auth' ? 'signed_out' : undefined);
+      p.reject(fail(code, message, reason));
+    }
+    function setCapabilities(list) {
+      caps = [];
+      for (var i = 0; i < list.length; i++) { if (typeof list[i] === 'string') caps.push(list[i]); }
+      heard = true;
+      if (current) current.capabilities = caps.slice();
+      for (var j = 0; j < listeners.length; j++) { try { listeners[j](caps.slice()); } catch (e3) { /* a listener must not break the bridge */ } }
+    }
+    function dispatch(data) {
+      if (!data || typeof data !== 'object' || data.channel !== CHANNEL) return;
+      if (data.kind === 'hello' && data.payload && Object.prototype.toString.call(data.payload.capabilities) === '[object Array]') { setCapabilities(data.payload.capabilities); return; }
+      if (data.kind === 'response' && typeof data.requestId === 'string') settle(data);
+    }
+    window.addEventListener('message', function (event) {
+      if (framed && event.source !== window.parent) return;
+      dispatch(event.data);
+    });
+    var extras = {
+      apiVersion: API_VERSION,
+      request: request,
+      can: function (name) { return caps.indexOf(name) >= 0; },
+      onCapabilities: function (cb) {
+        if (typeof cb !== 'function') return function () {};
+        listeners.push(cb);
+        if (heard) { try { cb(caps.slice()); } catch (e4) { /* see above */ } }
+        return function () { var i = listeners.indexOf(cb); if (i >= 0) listeners.splice(i, 1); };
+      },
+      __hostMessage: function (data) {
+        if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e5) { return; } }
+        dispatch(data);
+      }
+    };
+    function merge(obj) {
+      if (!obj || typeof obj !== 'object') return obj;
+      for (var k in extras) { if (Object.prototype.hasOwnProperty.call(extras, k) && !(k in obj)) obj[k] = extras[k]; }
+      obj.capabilities = caps.slice();
+      return obj;
+    }
+    Object.defineProperty(window, 'BeyondPlay', {
+      configurable: true,
+      enumerable: true,
+      get: function () { return current; },
+      set: function (value) { current = merge(value); }
+    });
+    window.BeyondPlay = {};
+  } catch (e) { /* never break the game over the bridge */ }
+})();
+</script>
 <!-- Feed touch isolation (mirrors arcade lib/create/touch-guard.ts): in-game swipes must never
      scroll the embedding feed. Canvas/pointer input is unaffected. -->
 <style data-bp-touch-guard>html,body{touch-action:none;overscroll-behavior:none}</style>

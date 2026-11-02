@@ -19,6 +19,7 @@ export const GAME_BUNDLE_GZIP_TARGET = { maxBytes: 1 * MB, docs: 'beyondplay-ski
 
 export const DOCS = {
   contract: 'beyondplay-skills skills/beyondplay-game/references/contract.md',
+  capabilities: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 9. Capabilities',
   testHook: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 6. The test hook',
   mobile: 'beyondplay-skills skills/beyondplay-game/references/mobile-rules.md',
   publishing: 'beyondplay-skills skills/beyondplay-game/references/submit.md',

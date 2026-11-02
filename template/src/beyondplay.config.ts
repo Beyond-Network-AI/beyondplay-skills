@@ -13,4 +13,6 @@ export const challenge = defineChallenge({
 });
 
 // For a score-only game with no duel: `export const game = defineSoloGame({});`
-export const game = defineSoloGame({ challenge });
+// `uses` names the platform capabilities the game asks for through
+// src/beyondplay-platform.ts (request('share') on the end card here).
+export const game = defineSoloGame({ challenge, uses: ['share'] });

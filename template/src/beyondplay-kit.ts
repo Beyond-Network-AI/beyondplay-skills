@@ -9,6 +9,8 @@
 // challenge.progress(score) on the way up to animate it, and subscribe with onMatchResult(cb) for
 // the outcome. All optional — a game that only calls submit(score) still gets the native strip.
 
+import type { CapabilityName } from './beyondplay-platform';
+
 export type SortableSeed = boolean;
 export type InstanceKind = 'static' | 'daily' | 'random' | 'rotating';
 /** Forward-compat: v1 ships 'score_duel'. The match object + kit are mode-discriminated so
@@ -77,10 +79,24 @@ const DEFAULT_BOARD = 'highscores';
 
 // Module-level registry the manifest emitter reads after importing beyondplay.config.ts (Node).
 // define* only RECORDS here (pure) — nothing touches window at import time.
-const __registry: { challenge: ChallengeDecl | null; playerMode: 'single' | 'duel' } = {
+const __registry: { challenge: ChallengeDecl | null; playerMode: 'single' | 'duel'; uses: string[] } = {
   challenge: null,
   playerMode: 'single',
+  uses: [],
 };
+
+/** Declare the platform capabilities this game asks for through src/beyondplay-platform.ts
+ *  (request('share'), request('player.profile'), ...). The manifest carries them as `uses`, so the
+ *  reviewer and the player can see what the game asks for; the validator checks that every
+ *  request() in the source is declared. defineSoloGame({ uses }) calls this for you. */
+export function declareUses(names: ReadonlyArray<CapabilityName | string>): void {
+  const seen = new Set(__registry.uses);
+  for (const n of names) {
+    if (typeof n !== 'string' || !n || seen.has(n)) continue;
+    seen.add(n);
+    __registry.uses.push(n);
+  }
+}
 
 function bp(): any {
   return (typeof window !== 'undefined' ? (window as any).BeyondPlay : undefined) ?? undefined;
@@ -115,10 +131,12 @@ export function defineChallengeBoard(decl: ChallengeDecl): ChallengeHandle {
 }
 
 /** Declare a solo score game. Pass a defineChallenge() result to make it duel-able, or null
- *  (or omit) for a non-duel game (share-only "Beat my run"). */
-export function defineSoloGame(opts?: { challenge?: ChallengeHandle | null; lowerIsBetter?: boolean }) {
+ *  (or omit) for a non-duel game. `uses` names the platform capabilities the game asks for
+ *  (see src/beyondplay-platform.ts): defineSoloGame({ challenge, uses: ['share'] }). */
+export function defineSoloGame(opts?: { challenge?: ChallengeHandle | null; lowerIsBetter?: boolean; uses?: ReadonlyArray<CapabilityName> }) {
   const ch = opts?.challenge ?? null;
   if (!ch) __registry.playerMode = 'single';
+  if (opts?.uses) declareUses(opts.uses);
   return {
     /** Report a finished run (to the duel board if declared, else the default solo board). */
     endRun(score: number) {
@@ -162,6 +180,15 @@ export function onMatchResult(cb: (result: MatchResult) => void): () => void {
 /** Build the beyondplay.json manifest from the declared kit calls. Called by scripts/emit-manifest.mjs
  *  at build (in Node) after importing beyondplay.config.ts. Maps the declaration to a ChallengeUnit. */
 export function buildManifest() {
+  return withUses(buildDuelManifest());
+}
+
+/** The capabilities the config declared (declareUses / defineSoloGame({ uses })), when any. */
+function withUses<T extends object>(manifest: T): T & { uses?: string[] } {
+  return __registry.uses.length ? { ...manifest, uses: __registry.uses.slice() } : manifest;
+}
+
+function buildDuelManifest() {
   const ch = __registry.challenge;
   if (!ch) return { playerMode: 'single', challenge: null, defaultUnitId: null };
   const boardId = ch.id ?? DEFAULT_BOARD;

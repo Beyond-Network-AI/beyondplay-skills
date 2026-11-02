@@ -12,9 +12,10 @@ After `npm run new-game -- <slug> "Display Name"`:
 
 | Path | Owner | Notes |
 |---|---|---|
-| `index.html` | platform | Seed bootstrap and touch guard. Only `<title>` may change. |
+| `index.html` | platform | Seed bootstrap, capability bridge and touch guard. Only `<title>` may change. |
 | `src/main.tsx` | platform | `window.BeyondPlay` shell, parent auth listener, WebKit image hardening, React mount of `./App`. |
-| `src/beyondplay-kit.ts` | platform | `defineChallenge`, `defineSoloGame`, `getMatch`, `onMatchResult`, `buildManifest`. |
+| `src/beyondplay-kit.ts` | platform | `defineChallenge`, `defineSoloGame`, `declareUses`, `getMatch`, `onMatchResult`, `buildManifest`. |
+| `src/beyondplay-platform.ts` | platform | `request`, `capabilities`, `can`, `onCapabilities`: the platform capabilities (section 9). Import it; do not edit it. |
 | `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
@@ -66,10 +67,13 @@ export const game = defineSoloGame({ challenge });
   direction. Call it exactly once per run.
 - `challenge.progress(score)`: optional live score on the way up. It animates
   the native duel strip and is a no-op outside a duel.
-- `defineSoloGame({ challenge })` returns `{ endRun(score), match }`.
+- `defineSoloGame({ challenge, uses })` returns `{ endRun(score), match }`.
   `endRun` forwards to `challenge.submit` when a challenge is passed, else to
   `gameOver` on the default board. Omit `challenge` (or pass `null`) for a
   game that is not duel-able; the manifest then says `playerMode: 'single'`.
+  `uses` names the platform capabilities the game asks for (section 9); the
+  manifest carries them as `uses`.
+- `declareUses(names)`: the same declaration without `defineSoloGame`.
 - `getMatch()`: the shared duel instance or `null` for a normal play. Fields:
   `seed`, `challengeId`, `mode` (`'score_duel'` in v1), `opponentScore`,
   `opponentName`, `metricLabel`, `lowerIsBetter`.
@@ -150,6 +154,9 @@ If the config fails to build, the emitter writes the solo manifest with an
 Conformance also fails when `instanceKind` is `random` and `needsSeed` is
 `false`, and when the file on disk differs from what the config declares.
 
+A config that declares `uses` adds `"uses": ["share"]` to either shape; a
+config that declares nothing omits the field.
+
 ## 4. The runtime SDK: `window.BeyondPlay`
 
 Installed by `src/main.tsx` before the game mounts.
@@ -162,6 +169,7 @@ Installed by `src/main.tsx` before the game mounts.
 | `progress({ score, board? })` | Posts `{ type: 'bp_progress', score, board }`. |
 | `haptic(kind)` | Posts `{ type: 'bp_haptic', kind }`. Kinds: `impact-light`, `impact-medium`, `impact-heavy`, `success`, `warning`, `error`, `selection`. |
 | `on('play_again', cb)` | Runs `cb` when the parent posts `{ type: 'bp_play_again' }`. |
+| `request(name, params)`, `capabilities`, `can(name)`, `onCapabilities(cb)`, `apiVersion` | The capability bridge, installed by `index.html` before the shell (section 9). Use `src/beyondplay-platform.ts` rather than these directly. |
 
 Every post goes to `window.ReactNativeWebView.postMessage` (the app) and to
 `window.parent.postMessage(message, '*')` (the feed). Outside an embedding
@@ -274,6 +282,59 @@ and equal the folder name; `name` is required; `tagline`, `description` and
 `tags` are what the submit step passes to `set_metadata`; `ageRating`
 defaults to `9+`; `visibility` stays `unlisted` (listing is the reviewer's
 decision through `submit_for_review`). The owner is the signed-in creator.
+
+## 9. Capabilities: what a game may ask the platform
+
+One door, `request(name, params)` from `src/beyondplay-platform.ts`, returns a
+promise the host answers. The host (the feed, the game page, the app) decides
+what it offers; `capabilities()` and `can(name)` say what, once the host has
+said hello, and `onCapabilities(cb)` fires when that list arrives. A rejected
+promise is normal: `err.code` is `denied` (the player said no or is signed
+out), `cancelled` (the player dismissed a sheet), `unsupported` (this host
+does not offer it) or `unavailable` (no host, or no answer within ten
+seconds); `err.reason` may say more (`signed_out`, `timeout`, `no_host`).
+
+Three rules: never gate play on an answer; never feed an answer into the
+seeded simulation (a duel must replay the same for both players); show a
+control that depends on a capability only when `can(name)` is true.
+
+Declare what the game uses in the config, so the reviewer and the player can
+see it and the validator can check it:
+
+```ts
+export const game = defineSoloGame({ challenge, uses: ['share', 'player.profile'] });
+```
+
+`GAME_CAPABILITY_UNDECLARED` (listing) fires for a `request()` the config
+does not declare; `GAME_CAPABILITY_UNKNOWN` (listing) for a name the table
+does not list.
+
+| Name | Tier | Params | Returns |
+|---|---|---|---|
+| `capabilities` | open | | `string[]`, the names this host offers. |
+| `host` | open | | `{ surface, locale, reducedMotion, authenticated, apiVersion }`; `surface` is `feed`, `page`, `app`, `telegram`, `desktop` or `unknown`. |
+| `player.profile` | open | | `{ displayName, handle, avatar }`, or `null` when signed out. Never an email, a wallet or an id. |
+| `share` | open | `{ score?, text? }` | `{ outcome: 'shared' \| 'copied' }`. The host opens its own share sheet with the game page and the score card; rejects with `cancelled` when the player dismisses it. |
+
+Tiers: `open` is answered without asking the player; `consent` (a later
+phase: `player.items`, `player.stats`, `player.friends`) asks the player once
+per game and can be revoked; `platform` (`platform.season`) is run by the
+platform, the game only reports. Names not yet offered answer `unsupported`.
+`get_contract` on the creator MCP serves the live table.
+
+The starter game shows the pattern: a Share control on the end card, rendered
+only when `can('share')`, calling `request('share', { score })` and ignoring
+the rejection.
+
+```ts
+import { can, onCapabilities, request } from './beyondplay-platform';
+
+onCapabilities(() => setCanShare(can('share')));
+request('share', { score }).catch(() => { /* dismissed, or not offered here */ });
+
+const who = await request('player.profile').catch(() => null);
+if (who?.displayName) greet(who.displayName);
+```
 
 ## Open questions for the platform team
 

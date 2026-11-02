@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { ext } from './files.js';
 import { DOCS } from './limits.js';
+import { CAPABILITY_NAMES } from './rules.js';
 
 const TEXT_EXT = new Set(['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'html', 'css', 'svelte', 'vue']);
 const MAX_TEXT_BYTES = 2 * 1024 * 1024;
@@ -30,7 +31,12 @@ const LINK_CONTEXT = /\bhref\s*[:=]|window\.open\s*\(|location\.(?:href|assign|r
 /** Identity prompts: the player is signed in to the platform; a game never asks. */
 const NAME_PROMPT = /\bwindow\.prompt\s*\(|(?<![.\w])prompt\s*\(|enter (?:your |a |the )?(?:name|nickname|username|email)|\byour name\b|\bplayer name\b|\bnickname\b|type=["']email["']/i;
 /** Share buttons and intents: the platform's share lives around the game, not in it. */
-const SHARE = /(?:twitter|x)\.com\/intent|navigator\.share\s*\(|navigator\.clipboard\.writeText|\bshare (?:on|to) (?:x|twitter)\b|>\s*share\s*<|['"]share['"]\s*[,)]/i;
+const SHARE_INTENT = /(?:twitter|x)\.com\/intent|navigator\.share\s*\(|navigator\.clipboard\.writeText|\bshare (?:on|to) (?:x|twitter)\b/i;
+/** A share control of the game's own; fine in a file that routes it through request('share'). */
+const SHARE_LABEL = />\s*share\s*<|(?<!request\(\s*)['"]share['"]\s*[,)]/i;
+const SHARE_REQUEST = /\brequest\s*\(\s*['"]share['"]/;
+/** A platform capability request: request('share'), request("player.profile", ...). */
+const CAPABILITY_CALL = /\brequest\s*\(\s*['"]([a-z][a-z0-9.]*)['"]/g;
 /** A gate before play: a Play or Start button, a splash, a "created by" card, a skip control. */
 const START_GATE = />\s*(?:play|start|tap to (?:play|start)|begin|let'?s go)\s*<|\bcreated by\b|>\s*skip\b|['"](?:title|splash|menu|intro)['"]\s*[:=]|phase\s*===?\s*['"](?:title|menu|splash|intro)['"]/i;
 const INSTRUCTION_TEXT = /\b(?:tap|swipe|hold|drag|flick) to \w+|how to play|\binstructions?\b/i;
@@ -91,7 +97,7 @@ export function scanSource(gameDir, files, templateOwned, report) {
       }
       if (!COMMENT_LINE.test(line)) {
         if (NAME_PROMPT.test(line)) once('nameprompt', () => report.error('GAME_NAME_PROMPT', s.rel, 'Asks the player for a name or other identity; the player is signed in to the platform and a game never asks.', 'Remove the prompt or field. Scores post to the signed-in account through challenge.submit; the shell knows who is playing.', { line: no, docs: DOCS.contract }));
-        if (SHARE.test(line)) once('share', () => report.warning('GAME_SHARE_BUTTON', s.rel, 'A share button, share intent or clipboard write inside the game; the platform\'s share lives on the game page and in the feed.', 'Remove it before listing. The platform shares the game with its own card and image; rewards for sharing are the platform\'s to give.', { line: no, docs: DOCS.mobile }));
+        if (SHARE_INTENT.test(line) || (SHARE_LABEL.test(line) && !SHARE_REQUEST.test(s.text))) once('share', () => report.warning('GAME_SHARE_BUTTON', s.rel, 'A share intent, social card or clipboard write of the game\'s own; the platform shares the game with its own card.', 'Replace it with request(\'share\', { score }) from src/beyondplay-platform.ts and declare uses: [\'share\']; the host opens the platform\'s sheet.', { line: no, docs: DOCS.capabilities }));
         if (START_GATE.test(line)) once('startgate', () => report.warning('GAME_START_GATE', s.rel, 'A Play or Start control, splash or "created by" card: the feed card must already be playing when it scrolls in.', 'Boot straight into a run; put restart on the end card and any picker behind a small settings control or after game over.', { line: no, docs: DOCS.mobile }));
         if (INSTRUCTION_TEXT.test(line)) once('instructions', () => report.warning('GAME_INSTRUCTION_TEXT', s.rel, 'Instruction text ("tap to", "how to play") in the UI.', 'Remove it; the first seconds of a run teach the one input.', { line: no, docs: DOCS.mobile }));
         if (DAILY_REWARD.test(line)) once('daily', () => report.info('GAME_DAILY_REWARD', s.rel, 'A daily reward or login bonus inside the game; it reads the wall clock and the platform cannot see it.', 'Keep rewards cosmetic and local, or ask the platform for a daily challenge; never purchase or earnings language.', { line: no, docs: DOCS.contract }));
@@ -164,4 +170,42 @@ export function checkAudioLicence(gameDir, files, report) {
   const NOTE = /^(?:credits|licen[cs]e|notice|attribution)s?(?:[.\-_]|$)|licen[cs]e/i;
   if (files.some((f) => NOTE.test(basename(f.rel)))) return;
   report.warning('GAME_AUDIO_LICENCE_MISSING', audio[0].rel, `${audio.length} audio file${audio.length === 1 ? '' : 's'} shipped but no CREDITS.md (or LICENCE note) found in the game folder.`, 'Add a CREDITS.md naming each track: title, author, source and licence. The licence must allow commercial games (CC0 is the default; the creator attests to the list on submission).', { docs: DOCS.playbookAudio });
+}
+
+/**
+ * The platform capabilities the game asks for (request('name') calls outside
+ * the template-owned files): each must be one the contract lists and, when the
+ * manifest is known, one the config declares in `uses`. The names are recorded
+ * as the report fact `uses` so the hosted check and the reviewer see them.
+ */
+export function checkCapabilities(files, templateOwned, manifest, report) {
+  const found = new Map();
+  for (const f of textFiles(files, templateOwned)) {
+    const text = readFileSync(f.abs, 'utf8');
+    const lines = text.split('\n');
+    lines.forEach((line, i) => {
+      if (COMMENT_LINE.test(line)) return;
+      for (const m of line.matchAll(CAPABILITY_CALL)) {
+        if (!found.has(m[1])) found.set(m[1], { rel: f.rel, line: i + 1 });
+      }
+    });
+  }
+  const names = [...found.keys()].sort();
+  report.fact('uses', names);
+  // A manifest without `uses` declared nothing; no manifest at all (the hosted check) leaves the declaration to the build.
+  const declared = manifest ? (Array.isArray(manifest.uses) ? manifest.uses.filter((u) => typeof u === 'string') : []) : null;
+  for (const name of names) {
+    const at = found.get(name);
+    if (!CAPABILITY_NAMES.includes(name)) {
+      report.error('GAME_CAPABILITY_UNKNOWN', at.rel, `request('${name}') asks for a capability the contract does not list; the host answers it as unsupported.`, `Use one of: ${CAPABILITY_NAMES.join(', ')}. get_contract on the creator MCP serves the table with what each returns.`, { line: at.line, docs: DOCS.capabilities });
+    } else if (declared && !declared.includes(name)) {
+      report.error('GAME_CAPABILITY_UNDECLARED', at.rel, `request('${name}') is used but the config does not declare it.`, `Add '${name}' to uses in src/beyondplay.config.ts: defineSoloGame({ challenge, uses: ['${name}'] }).`, { line: at.line, docs: DOCS.capabilities });
+    }
+  }
+  if (declared) {
+    for (const name of declared) {
+      if (!CAPABILITY_NAMES.includes(name)) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${name}', which the contract does not list.`, `Declare only: ${CAPABILITY_NAMES.join(', ')}.`, { docs: DOCS.capabilities });
+    }
+  }
+  return names;
 }
