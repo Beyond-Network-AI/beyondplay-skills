@@ -77,7 +77,7 @@
     var pending = {};
     var seq = 0;
     var listeners = [];
-    var current = null;
+    var current;
     var framed = false;
     try { framed = !!window.parent && window.parent !== window; } catch (e0) { framed = true; }
     function fail(code, message, reason) {
@@ -170,9 +170,8 @@
       configurable: true,
       enumerable: true,
       get: function () { return current; },
-      set: function (value) { current = merge(value); }
+      set: function (value) { try { current = merge(value); } catch (e6) { current = value; } }
     });
-    window.BeyondPlay = {};
   } catch (e) { /* never break the game over the bridge */ }
 })();</script>
 <!-- Feed touch isolation (mirrors arcade lib/create/touch-guard.ts): in-game swipes must never
