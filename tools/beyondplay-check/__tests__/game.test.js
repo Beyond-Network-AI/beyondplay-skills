@@ -68,14 +68,43 @@ describe('beyondplay-check game', () => {
     expect(r.ok).toBe(false);
   });
 
-  it('reports external requests as warnings and lets --fail-level warning fail them', async () => {
+  it('reports external requests as errors, and lets --fail-level warning fail a listing-tier warning', async () => {
     append(join(dir, 'src/App.tsx'), "fetch('https://example.com/scores.json');");
     const r = await checkGame(dir, { template: TEMPLATE });
-    expect(issue(r, 'GAME_EXTERNAL_REQUEST')).toMatchObject({ severity: 'warning', path: 'src/App.tsx' });
-    expect(r.counts.error).toBe(0);
+    expect(issue(r, 'GAME_EXTERNAL_REQUEST')).toMatchObject({ severity: 'error', path: 'src/App.tsx' });
+    expect(r.ok).toBe(false);
+    const warn = copyGame(tmp('bpcheck-warn-'));
+    append(join(warn, 'src/App.tsx'), "const hint = 'Tap to jump';");
+    expect((await checkGame(warn, { template: TEMPLATE })).ok).toBe(true);
+    expect((await checkGame(warn, { template: TEMPLATE, failLevel: 'warning' })).ok).toBe(false);
+    rmSync(warn, { recursive: true, force: true });
+  });
+
+  it('reports links out, identity prompts and share buttons, each with its tier', async () => {
+    append(join(dir, 'src/App.tsx'), "const a = <a href=\"https://opensea.io/item/ethereum/0x1\" target=\"_blank\">Open on OpenSea</a>;");
+    append(join(dir, 'src/App.tsx'), "const name = window.prompt('Enter your name');");
+    append(join(dir, 'src/App.tsx'), "const share = () => window.open('https://x.com/intent/tweet?text=hi');");
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_EXTERNAL_LINK')).toMatchObject({ severity: 'error', tier: 'publish', path: 'src/App.tsx' });
+    expect(issue(r, 'GAME_NAME_PROMPT')).toMatchObject({ severity: 'error', tier: 'publish' });
+    expect(issue(r, 'GAME_SHARE_BUTTON')).toMatchObject({ severity: 'warning', tier: 'listing' });
+    expect(r.ok).toBe(false);
+  });
+
+  it('flags a start gate and instruction text as listing-tier warnings, and an external request as an error', async () => {
+    append(join(dir, 'src/App.tsx'), "const gate = <button onClick={start}>Play</button>; const hint = 'Tap to jump';");
+    append(join(dir, 'src/App.tsx'), "const img = new Image(); img.src = 'https://cdn.example.com/bull.png';");
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_START_GATE')).toMatchObject({ severity: 'warning', tier: 'listing' });
+    expect(issue(r, 'GAME_INSTRUCTION_TEXT')).toMatchObject({ severity: 'warning', tier: 'listing' });
+    expect(issue(r, 'GAME_EXTERNAL_REQUEST')).toMatchObject({ severity: 'error', tier: 'publish' });
+  });
+
+  it('skipConfig leaves the config and the bundle to the hosted build', async () => {
+    const r = await checkGame(dir, { template: TEMPLATE, skipConfig: true });
     expect(r.ok).toBe(true);
-    const strict = await checkGame(dir, { template: TEMPLATE, failLevel: 'warning' });
-    expect(strict.ok).toBe(false);
+    expect(codes(r)).not.toContain('GAME_NO_BUILD');
+    expect(r.issues.every((i) => typeof i.tier === 'string')).toBe(true);
   });
 
   it('reports a missing config and a missing test hook', async () => {

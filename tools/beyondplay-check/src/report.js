@@ -3,6 +3,8 @@
 // JSON: { ok, target, counts: { error, warning, info }, issues: [{ code, severity, path, line?, message, remediation, docs? }] }
 // Codes are stable UPPER_SNAKE identifiers; `ok` is true when nothing at or above the fail level was found.
 
+import { tierOf } from './rules.js';
+
 const ORDER = { error: 0, warning: 1, info: 2 };
 const CODE = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/;
 
@@ -12,7 +14,7 @@ export function createReport(target) {
   const issues = [];
   const add = (severity, code, path, message, remediation, extra = {}) => {
     if (!CODE.test(code)) throw new Error(`issue code is not UPPER_SNAKE: ${code}`);
-    const issue = { code, severity, path: String(path ?? '.').split('\\').join('/'), message, remediation };
+    const issue = { code, severity, tier: tierOf(code), path: String(path ?? '.').split('\\').join('/'), message, remediation };
     if (Number.isInteger(extra.line)) issue.line = extra.line;
     if (extra.docs) issue.docs = extra.docs;
     issues.push(issue);

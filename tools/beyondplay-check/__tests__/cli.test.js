@@ -21,7 +21,7 @@ describe('beyondplay-check CLI', () => {
     failing = copyGame(join(root, 'failing'));
     writeFileSync(join(failing, 'src/main.tsx'), readFileSync(join(failing, 'src/main.tsx'), 'utf8') + '\n// edited\n');
     warning = copyGame(join(root, 'warning'));
-    writeFileSync(join(warning, 'src/App.tsx'), readFileSync(join(warning, 'src/App.tsx'), 'utf8') + "\nfetch('https://example.com/a.json');\n");
+    writeFileSync(join(warning, 'src/App.tsx'), readFileSync(join(warning, 'src/App.tsx'), 'utf8') + "\nconst hint = 'Tap to jump';\n");
   });
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 

@@ -18,12 +18,13 @@ export async function checkGame(dirArg, opts = {}) {
   const files = walk(dir); // node_modules, dist and .git excluded: the source archive a creator would upload
   checkSizeLimits(report, files, GAME_SOURCE, { files: 'GAME_SOURCE_TOO_MANY_FILES', total: 'GAME_SOURCE_TOO_LARGE', file: 'GAME_SOURCE_FILE_TOO_LARGE' }, 'the game source');
   const templateOwned = checkTemplate(dir, templateDir, report);
-  const manifest = await checkConfig(dir, report);
+  // opts.skipConfig: the hosted check evaluates the config in its own build and has no esbuild.
+  const manifest = opts.skipConfig ? null : await checkConfig(dir, report);
   checkPublishConfig(dir, report);
   checkArt(dir, report);
   checkSmokeDriver(dir, report);
   scanSource(dir, files, templateOwned, report);
   checkAudioLicence(dir, files, report);
-  checkBundle(dir, manifest, report);
+  if (!opts.skipConfig) checkBundle(dir, manifest, report);
   return report.finish(opts.failLevel);
 }

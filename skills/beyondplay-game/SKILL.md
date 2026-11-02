@@ -37,9 +37,24 @@ Read `references/contract.md`, `references/mobile-rules.md` and
 `references/smoke-ladder.md` before writing code. The other references cover
 assets, style and submission.
 
+Every rule has a tier. **publish**: refused mechanically, by the validator, by
+the MCP's `check_source` and by the hosted build; no judgment. **listing**:
+allowed unlisted (the playground), refused at listing; the reviewer's approve
+waits until the submission check carries none. **review**: the reviewer's eye.
+The validator prints the tier on every issue; `tools/beyondplay-check/src/rules.js`
+is the table, with the platform's alternative for each rule.
+
+### 0. Before writing code: tell the creator what is possible
+
+With the creator MCP connected, call `get_contract` and then `check_concept`
+with the creator's idea and the features you intend to build. It returns a
+verdict per feature: allowed, conditional or not, each with the platform's
+alternative. Relay the verdicts to the creator and agree the idea before you
+scaffold. Without the MCP, apply the hard rules below yourself and say so.
+
 ## Steps
 
-### 0. Set up the kit (once)
+### Set up the kit (once)
 
 ```bash
 git clone https://github.com/Beyond-Network-AI/beyondplay-skills
@@ -195,9 +210,10 @@ and fixed what looked wrong; the icon exists; `publish.config.json` and
 `CREDITS.md` are complete.
 
 Then `npm run pack -- games/<slug>` writes `out/<slug>.tar.gz`, and the
-creator MCP takes it from there (`references/submit.md`): upload, hosted
-build and checks, listing text and icon, publish unlisted, submit for review.
-Approval is what lists the game.
+creator MCP takes it from there (`references/submit.md`): upload,
+`check_source` (the static rules in seconds; fix every error before building),
+hosted build and checks, listing text and icon, publish unlisted, submit for
+review. Approval is what lists the game.
 
 ## Hard rules
 
@@ -210,6 +226,13 @@ Breaking any of these ships a broken game or a rejected one.
   `performance.now()` or unseeded entropy in the simulation.
 - No network calls except the platform's own. No CDNs, no ads, no fonts beyond
   the template's, no localStorage abuse. Strip them when porting.
+- A game never asks for a name, an email or any identity: the player is signed
+  in. A game never links out (no marketplaces, no social sites) and shows no
+  share button; the game page around the game carries the platform's share
+  and links.
+- Rewards, currencies and unlocks inside a game are cosmetic and local; no
+  purchase, earnings or token language. Seasons, prizes and tokens are the
+  platform's: ask for them, never build them in.
 - No wallet, token or NFT gating. Holding an asset unlocks nothing; wallet
   operations belong to the host shell. Character traits are cosmetic only.
 - No third-party brand names, characters or logos without a written partner
@@ -226,7 +249,10 @@ Breaking any of these ships a broken game or a rejected one.
 - Pointer events only, `touch-action: none` kept, no `100vh`, canvas scaled to
   the viewport with `devicePixelRatio` capped at 2.
 - No instruction text in the UI ("tap to", "swipe to", "hold to", "drag to",
-  "how to play"). No emoji in UI text unless asked.
+  "how to play"). No title screen, no Play or Start button, no splash, no
+  "created by" card, no picker before the first run: restart lives on the end
+  card, a picker behind a small settings control or after game over. No emoji
+  in UI text unless asked.
 - Do not edit platform-owned files or `template/`.
 - Import only packages the kit's root `package.json` declares; the hosted
   build has exactly those and nothing else. Every addition grows every

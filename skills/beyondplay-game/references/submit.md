@@ -61,10 +61,13 @@ the agent is acting as. If it is not yours, disconnect and sign in again.
 
 ## The tools, in order
 
-1. `get_contract` once per session: the current limits, the issue codes and
-   the terms version. Without this kit checked out, `get_template` returns
-   the starter game's files inline, with the platform-owned ones flagged;
-   the kit's checks still need the kit.
+1. `get_contract` once per session: the rules as data with their tier and the
+   platform's alternative, the limits, the path; pass `since` with a version
+   you hold to get only what changed. Then `check_concept` with the creator's
+   idea and the features you intend, and relay the verdicts before building.
+   Without this kit checked out, `get_template` returns the starter game's
+   files inline, with the platform-owned ones flagged; the kit's checks still
+   need the kit.
 2. `create_project` with `name` and an `idempotencyKey` (any stable string;
    a retry returns the same project). Keep the `projectId`.
 3. `request_upload_url` for the project, then PUT `out/<slug>.tar.gz` to the
@@ -74,33 +77,37 @@ the agent is acting as. If it is not yours, disconnect and sign in again.
    curl -X PUT -H "content-type: application/gzip" --data-binary @out/<slug>.tar.gz "<url>"
    ```
 
-4. `start_build` with the `uploadId`, then `get_build` every 15 to 20 seconds
+4. `check_source` with the `uploadId`: the static rules in seconds, no
+   sandbox. Fix every error (publish tier), re-upload, check again; the
+   hosted build fails on the same findings. Listing-tier findings allow an
+   unlisted publish but hold the listing; fix them before step 9.
+5. `start_build` with the `uploadId`, then `get_build` every 15 to 20 seconds
    until `state` is `passed` or `failed` (allow up to ten minutes; the first
    build wakes a sandbox). A failed report lists issues with codes, paths and
    fixes: fix the source, run the ladder, pack and upload again. The hosted
    check runs the build, the manifest, the bundle limits and conformance; it
    does not yet run the browser checks.
-5. `set_metadata` with `tagline`, `description` and `tags` from
+6. `set_metadata` with `tagline`, `description` and `tags` from
    `publish.config.json`.
-6. `request_icon_upload_url` with kind `icon`, PUT `assets/icon.png`, then
+7. `request_icon_upload_url` with kind `icon`, PUT `assets/icon.png`, then
    `set_icon` with the `uploadId`. Repeat with kind `banner` for
    `assets/banner.jpg` if you have one.
-7. `publish_unlisted` with the slug. Then `get_project` every 20 seconds
+8. `publish_unlisted` with the slug. Then `get_project` every 20 seconds
    until `publish.state` is `published` (allow up to six minutes). The game
    is playable at `https://<slug>.beyondplay.xyz` and
    `https://app.beyondplay.xyz/game/<slug>`; the leaderboard works at once;
    the feed and the duel picker do not show it yet.
-8. Play it on a phone. Fix, rebuild, re-upload and republish as needed; the
+9. Play it on a phone. Fix, rebuild, re-upload and republish as needed; the
    slug stays yours.
-9. `submit_for_review`. The platform runs one more hosted build over the
+10. `submit_for_review`. The platform runs one more hosted build over the
    archive that is live (the submission check); `get_review_status` shows
    its state and issues, and a reviewer can approve once it passes. If you
    built again after publishing, submit refuses with `REPUBLISH_REQUIRED`:
    publish first, so the game under review is the game that is live.
-   `get_review_status` and a notification carry the result: approved
-   (listed), changes requested (with notes; fix, republish and submit
-   again) or rejected (with notes). `withdraw_submission` pulls a pending
-   submission.
+   `get_review_status` says what blocks in `blockedBy` (a running or failed
+   check, listing rules still broken, waiting on the reviewer, changes
+   requested with notes, rejected) and a notification carries the result.
+   `withdraw_submission` pulls a pending submission.
 
 Limits: 50 MB and 1,500 files per archive, 10 MB per file; one build at a
 time, 50 a day, 10 in five minutes; 60 requests a minute. Slugs match

@@ -29,12 +29,14 @@ server; each asks you to sign in the first time.
 | Tool | What it does |
 |---|---|
 | `whoami` | The account the agent acts as, and its access. |
-| `get_contract` | The current limits, issue codes and terms version. |
+| `get_contract` | The rules as data (code, tier, the platform's alternative), the budgets, the path; `since` for what changed. |
+| `check_concept` | The creator's idea and intended features against the rules: a verdict per feature with the alternative, before anything is built. |
 | `get_template` | The starter game's files inline (the platform-owned shell and Tap Timing), for an agent without this kit; `files` selects a subset. |
 | `list_projects`, `get_project` | Your projects and one project's state (build, publish, review). |
 | `create_project` | A new project; send an `idempotencyKey` so a retry returns the same one. |
 | `request_upload_url` | A short-lived URL to PUT one tar.gz of the game source. |
-| `start_build`, `get_build` | The hosted build and checks on an upload; the report lists issues with codes and fixes. |
+| `check_source` | The static rules over an upload, in seconds; fix every error before building. |
+| `start_build`, `get_build` | The hosted build and checks on an upload; the report lists issues with codes, tiers and fixes. |
 | `set_metadata` | Tagline, description, tags. |
 | `request_icon_upload_url`, `set_icon` | The 512 x 512 icon (and the 1920 x 1080 banner). |
 | `publish_unlisted` | Publish a passed build at `https://<slug>.beyondplay.xyz`, absent from the feed. |
@@ -50,6 +52,15 @@ day, 10 in five minutes; 60 requests a minute.
 
 The full path, step by step, with what each failure means:
 `skills/beyondplay-game/references/submit.md`.
+
+## The tiers
+
+Every rule has a tier. `publish`: refused mechanically by the validator, `check_source` and
+the hosted build. `listing`: allowed unlisted, refused at listing; the reviewer's approve waits
+until the submission check carries none. `review`: the reviewer's eye. The server also sends
+its rules in the MCP handshake, serves the contract, the rules and the template as resources
+(`beyondplay://contract`, `beyondplay://rules`, `beyondplay://template/<path>`), and registers a
+`new-game` prompt for chat clients.
 
 ## If sign-in fails
 

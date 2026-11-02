@@ -25,6 +25,16 @@ const WALLET = [
 ];
 
 const MOUSE_TOUCH = /\bon(?:Mouse(?:Down|Move|Up)|Touch(?:Start|End))\b|addEventListener\(\s*['"](?:mousedown|mousemove|mouseup|touchstart|touchend)['"]/;
+/** A link or navigation out of the game (publish tier): an href, window.open or location change to a host that is not the platform's. */
+const LINK_CONTEXT = /\bhref\s*[:=]|window\.open\s*\(|location\.(?:href|assign|replace)\s*[=(]|\btarget\s*[:=]\s*['"]_blank['"]/i;
+/** Identity prompts: the player is signed in to the platform; a game never asks. */
+const NAME_PROMPT = /\bwindow\.prompt\s*\(|(?<![.\w])prompt\s*\(|enter (?:your |a |the )?(?:name|nickname|username|email)|\byour name\b|\bplayer name\b|\bnickname\b|type=["']email["']/i;
+/** Share buttons and intents: the platform's share lives around the game, not in it. */
+const SHARE = /(?:twitter|x)\.com\/intent|navigator\.share\s*\(|navigator\.clipboard\.writeText|\bshare (?:on|to) (?:x|twitter)\b|>\s*share\s*<|['"]share['"]\s*[,)]/i;
+/** A gate before play: a Play or Start button, a splash, a "created by" card, a skip control. */
+const START_GATE = />\s*(?:play|start|tap to (?:play|start)|begin|let'?s go)\s*<|\bcreated by\b|>\s*skip\b|['"](?:title|splash|menu|intro)['"]\s*[:=]|phase\s*===?\s*['"](?:title|menu|splash|intro)['"]/i;
+const INSTRUCTION_TEXT = /\b(?:tap|swipe|hold|drag|flick) to \w+|how to play|\binstructions?\b/i;
+const DAILY_REWARD = /daily (?:bonus|reward|gift|login|streak)|login bonus|once (?:per|a) day/i;
 const WALL_CLOCK = /\b(?:Date\.now|performance\.now)\s*\(/g;
 const GAME_OVER = /\.submit\s*\(|\.endRun\s*\(|BeyondPlay\??\.gameOver\s*\(/;
 const LEADERBOARD = /\.leaderboard\s*\(/;
@@ -69,13 +79,22 @@ export function scanSource(gameDir, files, templateOwned, report) {
         const host = m[1];
         if (ALLOWED_HOST.test(host)) continue;
         const request = REQUEST_CONTEXT.test(line) && !COMMENT_LINE.test(line);
-        once(`url:${host}:${request}`, () => {
-          if (request) report.warning('GAME_EXTERNAL_REQUEST', s.rel, `Loads from or talks to ${host} (${m[0]}); games may only call beyondplay.xyz hosts.`, 'Bundle the asset or data with the game, or drop the call; external calls fail under the platform CSP and are stripped when porting.', { line: no, docs: DOCS.porting });
+        const link = LINK_CONTEXT.test(line) && !COMMENT_LINE.test(line);
+        once(`url:${host}:${link ? 'link' : request}`, () => {
+          if (link) report.error('GAME_EXTERNAL_LINK', s.rel, `Links out of the game to ${host} (${m[0]}); a game shows nothing that leaves it.`, 'Remove the link. The game page around the game carries the platform\'s links; marketplaces and social sites are never linked from inside a game.', { line: no, docs: DOCS.porting });
+          else if (request) report.error('GAME_EXTERNAL_REQUEST', s.rel, `Loads from or talks to ${host} (${m[0]}); games may only call beyondplay.xyz hosts.`, 'Bundle the asset or data with the game, or drop the call; external calls fail under the platform CSP and are stripped when porting.', { line: no, docs: DOCS.porting });
           else report.info('GAME_EXTERNAL_URL', s.rel, `Mentions an external URL (${m[0]}); make sure nothing is fetched from it at runtime.`, 'Fine in a comment or credit line; otherwise bundle the resource.', { line: no, docs: DOCS.porting });
         });
       }
       for (const re of WALLET) {
         if (re.test(line)) once(`wallet:${re.source}`, () => report.error('GAME_WALLET_GATING', s.rel, `Wallet or token-gating pattern ${re.source.replace(/\\b/g, '')} found; games never connect wallets or gate on NFTs, the platform owns identity.`, 'Remove the wallet code; the platform owns identity and the kit reports scores.', { line: no, docs: DOCS.porting }));
+      }
+      if (!COMMENT_LINE.test(line)) {
+        if (NAME_PROMPT.test(line)) once('nameprompt', () => report.error('GAME_NAME_PROMPT', s.rel, 'Asks the player for a name or other identity; the player is signed in to the platform and a game never asks.', 'Remove the prompt or field. Scores post to the signed-in account through challenge.submit; the shell knows who is playing.', { line: no, docs: DOCS.contract }));
+        if (SHARE.test(line)) once('share', () => report.warning('GAME_SHARE_BUTTON', s.rel, 'A share button, share intent or clipboard write inside the game; the platform\'s share lives on the game page and in the feed.', 'Remove it before listing. The platform shares the game with its own card and image; rewards for sharing are the platform\'s to give.', { line: no, docs: DOCS.mobile }));
+        if (START_GATE.test(line)) once('startgate', () => report.warning('GAME_START_GATE', s.rel, 'A Play or Start control, splash or "created by" card: the feed card must already be playing when it scrolls in.', 'Boot straight into a run; put restart on the end card and any picker behind a small settings control or after game over.', { line: no, docs: DOCS.mobile }));
+        if (INSTRUCTION_TEXT.test(line)) once('instructions', () => report.warning('GAME_INSTRUCTION_TEXT', s.rel, 'Instruction text ("tap to", "how to play") in the UI.', 'Remove it; the first seconds of a run teach the one input.', { line: no, docs: DOCS.mobile }));
+        if (DAILY_REWARD.test(line)) once('daily', () => report.info('GAME_DAILY_REWARD', s.rel, 'A daily reward or login bonus inside the game; it reads the wall clock and the platform cannot see it.', 'Keep rewards cosmetic and local, or ask the platform for a daily challenge; never purchase or earnings language.', { line: no, docs: DOCS.contract }));
       }
       if (MOUSE_TOUCH.test(line)) once('mousetouch', () => report.warning('GAME_MOUSE_TOUCH_EVENTS', s.rel, 'Mouse or touch event handlers found; mobile input must use pointer events only.', 'Use pointerdown/move/up/cancel with setPointerCapture (a non-passive touchmove guard that only cancels scrolling is fine).', { line: no, docs: DOCS.mobile }));
       if (/\b100vh\b/.test(line)) once('100vh', () => report.warning('GAME_VIEWPORT_100VH', s.rel, '100vh found; on iOS the URL bar makes it jump.', 'Use 100% or 100dvh heights and letterbox the canvas to window.innerWidth/innerHeight.', { line: no, docs: DOCS.mobile }));
