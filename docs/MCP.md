@@ -40,6 +40,7 @@ server; each asks you to sign in the first time.
 | `set_metadata` | Tagline, description, tags. |
 | `request_icon_upload_url`, `set_icon` | The 512 x 512 icon (and the 1920 x 1080 banner). |
 | `publish_unlisted` | Publish a passed build at `https://<slug>.beyondplay.xyz`, absent from the feed. |
+| `reset_leaderboard` | Wipe a published game's scores, every board or one, for a fresh start after a balance change. Cannot be undone. |
 | `submit_for_review`, `withdraw_submission`, `get_review_status` | The review gate. Submitting runs one more hosted build over the live archive; a reviewer approves once it passes, and approval lists the game. |
 
 The archive: `npm run pack -- games/<slug>` writes `out/<slug>.tar.gz` with `src/`,
@@ -49,7 +50,7 @@ The platform keeps its own copies of the platform-owned files (`src/main.tsx`,
 travels with the game; the report records the capabilities the game requests
 (`facts.uses`), and `get_contract` serves the capability table.
 
-Limits: 50 MB and 1,500 files per archive, 10 MB per file; one build at a time, 50 a
+Limits: 50 MB and 1,500 files per archive, 10 MB per file; one build at a time, 100 a
 day, 10 in five minutes; 60 requests a minute.
 
 The full path, step by step, with what each failure means:

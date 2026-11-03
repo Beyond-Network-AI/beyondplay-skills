@@ -110,7 +110,7 @@ the agent is acting as. If it is not yours, disconnect and sign in again.
    `withdraw_submission` pulls a pending submission.
 
 Limits: 50 MB and 1,500 files per archive, 10 MB per file; one build at a
-time, 50 a day, 10 in five minutes; 60 requests a minute. Slugs match
+time, 100 a day, 10 in five minutes; 60 requests a minute. Slugs match
 `^[a-z0-9][a-z0-9-]{2,40}$` and are first come, first served.
 
 ## Republishing and changes
