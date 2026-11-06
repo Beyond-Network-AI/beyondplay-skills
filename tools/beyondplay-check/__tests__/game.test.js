@@ -138,6 +138,12 @@ describe('beyondplay-check game', () => {
     expect(codes(r).filter((c) => c.startsWith('GAME_BUNDLE'))).toEqual([]);
     expect(issue(r, 'GAME_INITIAL_DOWNLOAD').message).toMatch(/2 synchronous assets/);
 
+    write(join(dist, 'models/arena.glb'), Buffer.alloc(26 * MB, 1));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_PUBLISHED_WEIGHT_HEAVY')).toMatchObject({ severity: 'warning', tier: 'listing', path: 'dist' });
+    expect(issue(r, 'GAME_PUBLISHED_WEIGHT_HEAVY').message).toContain('dist/models/arena.glb');
+    rmSync(join(dist, 'models'), { recursive: true, force: true });
+
     write(join(dist, 'beyondplay.json'), JSON.stringify({ ...manifest, defaultUnitId: 'other' }));
     r = await checkGame(dir, { template: TEMPLATE });
     expect(issue(r, 'GAME_BUNDLE_MANIFEST_MISMATCH')).toMatchObject({ severity: 'error', path: 'dist/beyondplay.json' });

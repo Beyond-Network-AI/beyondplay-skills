@@ -5,7 +5,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { checkSizeLimits, fmtBytes, walk } from './files.js';
-import { DOCS, GAME_BUNDLE, GAME_BUNDLE_GZIP_TARGET, GAME_INITIAL_DOWNLOAD } from './limits.js';
+import { DOCS, GAME_BUNDLE, GAME_BUNDLE_GZIP_TARGET, GAME_INITIAL_DOWNLOAD, GAME_PUBLISHED_WEIGHT_WARN } from './limits.js';
 
 const SYNC_REFS = [
   /<script\b[^>]*\ssrc\s*=\s*["']([^"']+)["']/gi,
@@ -21,6 +21,11 @@ export function checkBundle(gameDir, configManifest, report) {
   }
   const files = walk(dist, new Set(['.DS_Store']));
   checkSizeLimits(report, files.map((f) => ({ ...f, rel: posix.join('dist', f.rel) })), GAME_BUNDLE, { files: 'GAME_BUNDLE_TOO_MANY_FILES', total: 'GAME_BUNDLE_TOO_LARGE', file: 'GAME_BUNDLE_FILE_TOO_LARGE' }, 'dist/');
+  const total = files.reduce((n, f) => n + f.size, 0);
+  if (total > GAME_PUBLISHED_WEIGHT_WARN.maxBytes && total <= GAME_BUNDLE.maxTotalBytes) {
+    const largest = [...files].sort((a, b) => b.size - a.size).slice(0, 3).map((f) => `dist/${f.rel} (${fmtBytes(f.size)})`).join(', ');
+    report.warning('GAME_PUBLISHED_WEIGHT_HEAVY', 'dist', `dist/ is ${fmtBytes(total)}; a game over ${fmtBytes(GAME_PUBLISHED_WEIGHT_WARN.maxBytes)} is slow to open on a phone and the feed preloads neighbouring cards. Largest: ${largest}.`, 'Compress models and textures to the kit\'s targets, drop unused characters and realms, stream audio after the first frame.', { docs: GAME_PUBLISHED_WEIGHT_WARN.docs });
+  }
 
   const indexAbs = join(dist, 'index.html');
   if (!existsSync(indexAbs)) {

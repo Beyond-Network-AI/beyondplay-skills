@@ -11,6 +11,9 @@ export const GAME_SOURCE = { maxFiles: 1500, maxTotalBytes: 50 * MB, maxFileByte
 /** The published bundle (dist/), as the arcade's extractor enforces it. */
 export const GAME_BUNDLE = { maxFiles: 500, maxTotalBytes: 100 * MB, maxFileBytes: 10 * MB, docs: `${DESIGN} (published bundle)` };
 
+/** Above this a published game gets a listing-tier warning (GAME_PUBLISHED_WEIGHT_HEAVY): slow to open on a phone, and the feed preloads neighbours. */
+export const GAME_PUBLISHED_WEIGHT_WARN = { maxBytes: 25 * MB, docs: `${DESIGN} (published weight, listing tier)` };
+
 /** What a phone downloads before the first frame: index.html plus what it references synchronously. */
 export const GAME_INITIAL_DOWNLOAD = { maxBytes: 20 * MB, docs: `${DESIGN} (initial download, phones)` };
 
