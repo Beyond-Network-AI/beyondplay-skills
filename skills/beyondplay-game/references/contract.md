@@ -315,17 +315,82 @@ does not list.
 | `host` | open | | `{ surface, locale, reducedMotion, authenticated, apiVersion }`; `surface` is `feed`, `page`, `app`, `telegram`, `desktop` or `unknown`. |
 | `player.profile` | open | | `{ displayName, handle, avatar }`, or `null` when signed out. Never an email, a wallet or an id. |
 | `share` | open | `{ score?, text? }` | `{ outcome: 'shared' \| 'copied' }`. The host opens its own share sheet with the game page and the score card; rejects with `cancelled` when the player dismisses it. |
+| `player.items` | open | `{ collection }` | `PlayerItem[]`, the player's items in the one collection the game declared; `null` when signed out, no wallet is linked, the player opted out or the game is not allowed to ask; `[]` when the wallet holds nothing in it. Declared as `player.items:<collection>` in `uses`. See Player items below. |
+| `player.stats` | open | | `{ best, plays, lastPlayedAt }` for this game, or `null` when signed out; what the leaderboard already shows. |
+| `player.friends` | open | | `[{ displayName, avatar, best }]` for friends who played this game, or `null` when signed out. No ids, no items, no lookup by player. |
 
 Tiers: `open` is answered without asking the player, which covers
-everything offered and planned (`player.items`, `player.stats`,
-`player.friends` follow in a later phase); `platform` (`platform.season`) is
-run by the platform, the game only reports; `consent` is reserved for
-something that would leave the platform or identify the account, which
-nothing offered does. A game runs inside the platform with no network of its
-own, so what it is handed stays on the platform's screens; the listing
-discloses what a game uses, and the platform can switch a capability off for
-one game. Names not yet offered answer `unsupported`. `get_contract` on the
-creator MCP serves the live table.
+everything offered (phase one and, since 6 November 2026, phase two:
+`player.items`, `player.stats`, `player.friends`); `platform`
+(`platform.season`) is run by the platform, the game only reports; `consent`
+is reserved for something that would leave the platform or identify the
+account, which nothing offered does. A game runs inside the platform with no
+network of its own, so what it is handed stays on the platform's screens; the
+listing discloses what a game uses, and the platform can switch a capability
+off for one game. Names not yet offered answer `unsupported`. `get_contract`
+on the creator MCP serves the live table.
+
+### Player items
+
+The platform hands a game the items a player holds in one collection, as
+items: never a wallet address, a chain, a contract or a balance. The shape,
+from `src/beyondplay-platform.ts` (`PlayerItem`, `ItemModel`):
+
+```ts
+interface PlayerItem {
+  id: string;                        // 'cobi:5759'
+  collection: string;                // 'cobi'
+  tokenId: string;                   // '5759'
+  name: string;                      // 'Cobi #5759'
+  image: string;                     // on assets.beyondplay.xyz
+  traits: Record<string, string>;    // { Fur: 'Gold', Horns: 'Fire', ... }
+  model?: { kind: 'kit'; kit; base; clips; clipNames; skeleton; height; facing; feetAt }
+        | { kind: 'baked'; url: string };
+  borrowed: boolean;                 // lent by the platform; looks the same
+  until?: string;                    // when a borrowed item goes back
+  quantity?: number;                 // ERC-1155 collections
+}
+```
+
+The declaration names the collection with the capability, and the request
+names the same slug, in `src/App.tsx`, never in `src/game.ts`:
+
+```ts
+export const game = defineSoloGame({ challenge, uses: ['share', 'player.items:cobi'] });
+
+const items = await request('player.items', { collection: 'cobi' }).catch(() => null);
+```
+
+Three rules on top of the three above:
+
+1. Items change how a run looks and sounds, never how it plays. A trait may
+   pick the model, a trail, a sound, a greeting, the name on the end card; no
+   stats, lives, loadouts, unlocks, starts or multipliers from an item or a
+   trait, and nothing the simulation reads (`GAME_ITEM_GATING`, review tier;
+   `GAME_ITEM_IN_SIMULATION`, listing tier, when `player.items` or
+   `PlayerItem` appears in `src/game.ts`).
+2. Every player gets a bull. The answer is `null` for most plays; the game
+   falls back to the collection's default item silently. The default is
+   served by `get_contract` as `capabilities[].default` for the collection.
+   No copy about linking a wallet, and nothing that invites buying, linking
+   or renting, anywhere in a game.
+3. One declared collection. A bare `'player.items'` in `uses` declares none
+   (`GAME_CAPABILITY_UNDECLARED`); the host answers `denied` for a collection
+   the manifest does not declare. A game cannot read holdings across
+   collections.
+
+Borrowed items carry `borrowed: true` and `until`; nothing else changes and no
+payment is visible to a game. A kit model is assembled by
+`src/cobi-kit.ts` (platform-owned, ships with the template):
+`CobiKit.load(item.model.base, { tokens: false, kit: item.model.kit })`, then
+`kit.build(item.traits)`, clips from `item.model.clips` through an
+`AnimationMixer`, `release()` on game over. A 2D game uses `item.image` as an
+avatar. The recipe: `docs/player-items.md` in the kit.
+
+CSP: a game that declares any `player.*` capability is served with an
+enumerated policy and can only reach the platform's hosts
+(`*.beyondplay.xyz`, including `assets.beyondplay.xyz`); no chain RPC and no
+third-party host, whatever the source says.
 
 The starter game shows the pattern: a Share control on the end card, rendered
 only when `can('share')`, calling `request('share', { score })` and ignoring

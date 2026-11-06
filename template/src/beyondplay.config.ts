@@ -15,4 +15,6 @@ export const challenge = defineChallenge({
 // For a score-only game with no duel: `export const game = defineSoloGame({});`
 // `uses` names the platform capabilities the game asks for through
 // src/beyondplay-platform.ts (request('share') on the end card here).
+// A game that shows the player's bulls declares the collection with the capability
+// (docs/player-items.md): `uses: ['share', 'player.items:cobi']`.
 export const game = defineSoloGame({ challenge, uses: ['share'] });

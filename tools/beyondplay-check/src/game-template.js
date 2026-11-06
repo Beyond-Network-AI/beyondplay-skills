@@ -1,8 +1,11 @@
 // Platform-owned files: a game must carry the template's copies unchanged.
 // The platform contract names index.html (only <title> may change),
-// src/main.tsx and src/beyondplay-kit.ts. The other files the template ships
-// (vite.config.ts, tsconfig.json, src/haptics.ts, src/index.css,
-// src/webkit-image-hardening.ts) are not protected by the contract, so a
+// src/main.tsx, src/beyondplay-kit.ts and src/cobi-kit.ts (the COBI loader,
+// synced from the games repository by scripts/sync-cobi-kit.mjs; a game
+// scaffolded before it existed may lack it, which is drift, not an error, but
+// an edited copy is). The other files the template ships (vite.config.ts,
+// tsconfig.json, src/haptics.ts, src/index.css, src/webkit-image-hardening.ts,
+// src/cobi-kit.SOURCE.json) are not protected by the contract, so a
 // difference there is a warning (drift), not an error.
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -10,7 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { sha256, walk } from './files.js';
 import { DOCS } from './limits.js';
 
-export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit.ts'];
+export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts'];
+/** Contract files a game may ship without: added after the first games were scaffolded, so absence is drift, not an error. */
+export const OPTIONAL_CONTRACT_FILES = new Set(['src/cobi-kit.ts']);
 /** Starter files the template ships for the game to replace; never compared. */
 export const STARTER_FILES = new Set(['src/App.tsx', 'src/game.ts', 'src/beyondplay.config.ts', 'smoke.driver.mjs']);
 
@@ -56,7 +61,7 @@ export function checkTemplate(gameDir, templateDir, report) {
   if (!templateDir) {
     report.warning('GAME_TEMPLATE_UNAVAILABLE', '.', 'No template/ folder found to compare the platform-owned files against.', 'Run inside the kit, or pass --template <dir> (or set BEYONDPLAY_TEMPLATE).', { docs: DOCS.contract });
     for (const rel of CONTRACT_FILES) {
-      if (!existsSync(join(gameDir, rel))) report.error('GAME_TEMPLATE_FILE_MISSING', rel, `${rel} is missing; it is platform-owned and every game ships it.`, `Copy it from template/${rel}.`, { docs: DOCS.contract });
+      if (!existsSync(join(gameDir, rel)) && !OPTIONAL_CONTRACT_FILES.has(rel)) report.error('GAME_TEMPLATE_FILE_MISSING', rel, `${rel} is missing; it is platform-owned and every game ships it.`, `Copy it from template/${rel}.`, { docs: DOCS.contract });
     }
     return owned;
   }
@@ -66,7 +71,7 @@ export function checkTemplate(gameDir, templateDir, report) {
     const contract = CONTRACT_FILES.includes(t.rel);
     const gameAbs = join(gameDir, t.rel);
     if (!existsSync(gameAbs)) {
-      if (contract) report.error('GAME_TEMPLATE_FILE_MISSING', t.rel, `${t.rel} is missing; it is platform-owned and every game ships it.`, `Copy it from template/${t.rel}.`, { docs: DOCS.contract });
+      if (contract && !OPTIONAL_CONTRACT_FILES.has(t.rel)) report.error('GAME_TEMPLATE_FILE_MISSING', t.rel, `${t.rel} is missing; it is platform-owned and every game ships it.`, `Copy it from template/${t.rel}.`, { docs: DOCS.contract });
       else report.warning('GAME_TEMPLATE_FILE_DRIFT', t.rel, `${t.rel} is missing; the template ships it.`, `Copy it from template/${t.rel} unless the game replaced it on purpose.`, { docs: DOCS.contract });
       continue;
     }

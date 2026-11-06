@@ -48,7 +48,25 @@ The archive: `npm run pack -- games/<slug>` writes `out/<slug>.tar.gz` with `src
 The platform keeps its own copies of the platform-owned files (`src/main.tsx`,
 `src/beyondplay-kit.ts`) and notes it in the report. `src/beyondplay-platform.ts`
 travels with the game; the report records the capabilities the game requests
-(`facts.uses`), and `get_contract` serves the capability table.
+(`facts.uses`, with the collection for `player.items:cobi`), and `get_contract` serves
+the capability table.
+
+## The capabilities
+
+What a game may ask the platform for through `request(name, params)` from
+`src/beyondplay-platform.ts`, declared in `uses` on `defineSoloGame`; `get_contract`
+serves the live table with `since` and, for `player.items`, each offered collection
+and its default item (`capabilities[].default`).
+
+| Name | Params | Returns |
+|---|---|---|
+| `capabilities` | | `string[]`, the names this host offers. |
+| `host` | | `{ surface, locale, reducedMotion, authenticated, apiVersion }`. |
+| `player.profile` | | `{ displayName, handle, avatar }` or `null` when signed out. |
+| `share` | `{ score?, text? }` | `{ outcome }`; the host opens its own share sheet. |
+| `player.items` | `{ collection }` | `PlayerItem[]` in the one declared collection (`uses: ['player.items:cobi']`), `null` when signed out, no wallet, opted out or not allowed, `[]` when the wallet holds nothing. Look and sound only. |
+| `player.stats` | | `{ best, plays, lastPlayedAt }` for this game, or `null`. |
+| `player.friends` | | `[{ displayName, avatar, best }]` for friends who played this game, or `null`. |
 
 Limits: 50 MB and 1,500 files per archive, 10 MB per file; one build at a time, 100 a
 day, 10 in five minutes; 60 requests a minute.
