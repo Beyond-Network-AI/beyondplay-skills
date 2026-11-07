@@ -5,7 +5,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { checkSizeLimits, fmtBytes, walk } from './files.js';
-import { DOCS, GAME_BUNDLE, GAME_BUNDLE_GZIP_TARGET, GAME_INITIAL_DOWNLOAD, GAME_PUBLISHED_WEIGHT_WARN } from './limits.js';
+import { DOCS, GAME_BUNDLE, GAME_BUNDLE_GZIP_TARGET, GAME_INITIAL_DOWNLOAD, GAME_PUBLISHED_WEIGHT_MAX, GAME_PUBLISHED_WEIGHT_WARN } from './limits.js';
 
 const SYNC_REFS = [
   /<script\b[^>]*\ssrc\s*=\s*["']([^"']+)["']/gi,
@@ -23,8 +23,14 @@ export function checkBundle(gameDir, configManifest, report) {
   checkSizeLimits(report, files.map((f) => ({ ...f, rel: posix.join('dist', f.rel) })), GAME_BUNDLE, { files: 'GAME_BUNDLE_TOO_MANY_FILES', total: 'GAME_BUNDLE_TOO_LARGE', file: 'GAME_BUNDLE_FILE_TOO_LARGE' }, 'dist/');
   const total = files.reduce((n, f) => n + f.size, 0);
   if (total > GAME_PUBLISHED_WEIGHT_WARN.maxBytes && total <= GAME_BUNDLE.maxTotalBytes) {
+    // 25 to 50 MB: the reviewer sees it (review tier); over 50 MB: not listable (listing tier); over 100 MB: refused above.
     const largest = [...files].sort((a, b) => b.size - a.size).slice(0, 3).map((f) => `dist/${f.rel} (${fmtBytes(f.size)})`).join(', ');
-    report.warning('GAME_PUBLISHED_WEIGHT_HEAVY', 'dist', `dist/ is ${fmtBytes(total)}; a game over ${fmtBytes(GAME_PUBLISHED_WEIGHT_WARN.maxBytes)} is slow to open on a phone and the feed preloads neighbouring cards. Largest: ${largest}.`, 'Compress models and textures to the kit\'s targets, drop unused characters and realms, stream audio after the first frame.', { docs: GAME_PUBLISHED_WEIGHT_WARN.docs });
+    const instead = 'Compress models and textures to the kit\'s targets, load shared characters from the asset host instead of bundling them, drop unused realms, stream audio after the first frame.';
+    if (total > GAME_PUBLISHED_WEIGHT_MAX.maxBytes) {
+      report.warning('GAME_PUBLISHED_WEIGHT_TOO_HEAVY', 'dist', `dist/ is ${fmtBytes(total)}; a game over ${fmtBytes(GAME_PUBLISHED_WEIGHT_MAX.maxBytes)} cannot be listed (it still publishes unlisted). Largest: ${largest}.`, instead, { docs: GAME_PUBLISHED_WEIGHT_MAX.docs });
+    } else {
+      report.warning('GAME_PUBLISHED_WEIGHT_HEAVY', 'dist', `dist/ is ${fmtBytes(total)}; between ${fmtBytes(GAME_PUBLISHED_WEIGHT_WARN.maxBytes)} and ${fmtBytes(GAME_PUBLISHED_WEIGHT_MAX.maxBytes)} the reviewer sees the size; it does not block listing. Largest: ${largest}.`, instead, { docs: GAME_PUBLISHED_WEIGHT_WARN.docs });
+    }
   }
 
   const indexAbs = join(dist, 'index.html');
