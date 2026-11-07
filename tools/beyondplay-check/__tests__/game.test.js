@@ -140,8 +140,15 @@ describe('beyondplay-check game', () => {
 
     write(join(dist, 'models/arena.glb'), Buffer.alloc(26 * MB, 1));
     r = await checkGame(dir, { template: TEMPLATE });
-    expect(issue(r, 'GAME_PUBLISHED_WEIGHT_HEAVY')).toMatchObject({ severity: 'warning', tier: 'listing', path: 'dist' });
+    expect(issue(r, 'GAME_PUBLISHED_WEIGHT_HEAVY')).toMatchObject({ severity: 'warning', tier: 'review', path: 'dist' });
     expect(issue(r, 'GAME_PUBLISHED_WEIGHT_HEAVY').message).toContain('dist/models/arena.glb');
+    expect(codes(r)).not.toContain('GAME_PUBLISHED_WEIGHT_TOO_HEAVY');
+    write(join(dist, 'models/arena-2.glb'), Buffer.alloc(9 * MB, 1));
+    write(join(dist, 'models/arena-3.glb'), Buffer.alloc(9 * MB, 1));
+    write(join(dist, 'models/arena-4.glb'), Buffer.alloc(9 * MB, 1));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_PUBLISHED_WEIGHT_TOO_HEAVY')).toMatchObject({ severity: 'warning', tier: 'listing', path: 'dist' });
+    expect(codes(r)).not.toContain('GAME_PUBLISHED_WEIGHT_HEAVY');
     rmSync(join(dist, 'models'), { recursive: true, force: true });
 
     write(join(dist, 'beyondplay.json'), JSON.stringify({ ...manifest, defaultUnitId: 'other' }));

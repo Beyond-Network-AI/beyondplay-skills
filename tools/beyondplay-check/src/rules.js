@@ -50,7 +50,8 @@ export const RULES = [
   // ── weight ───────────────────────────────────────────────────────────────
   { code: 'GAME_BUNDLE_OVER_TARGET', tier: 'listing', rule: 'The first-frame download stays well under 1 MB gzipped.', instead: 'Draw in code, load heavy assets after the first frame, compress models and textures.' },
   { code: 'GAME_INITIAL_DOWNLOAD_TOO_LARGE', tier: 'publish', rule: 'At most 20 MB before the first frame on a phone.' },
-  { code: 'GAME_PUBLISHED_WEIGHT_HEAVY', tier: 'listing', rule: 'A published game over 25 MB is slow to open on a phone and the feed preloads neighbouring cards; the check names the three largest files.', instead: 'Compress models and textures to the kit\'s targets, drop unused characters and realms, stream audio after the first frame.' },
+  { code: 'GAME_PUBLISHED_WEIGHT_HEAVY', tier: 'review', rule: 'A published game between 25 and 50 MB is heavy for a phone on mobile data; the reviewer sees the size and the three largest files. It does not block listing.', instead: 'Compress models and textures to the kit\'s targets, load shared characters from the asset host instead of bundling them, drop unused realms, stream audio after the first frame.' },
+  { code: 'GAME_PUBLISHED_WEIGHT_TOO_HEAVY', tier: 'listing', rule: 'A published game over 50 MB cannot be listed: too slow to open on a phone and too costly on mobile data in a swipe feed. It still publishes unlisted up to 100 MB.', instead: 'Compress models and textures to the kit\'s targets, load shared characters from the asset host instead of bundling them, drop unused realms, stream audio after the first frame.' },
   { code: 'GAME_BUNDLE_TOO_LARGE', tier: 'publish', rule: 'At most 100 MB published.' },
   { code: 'GAME_BUNDLE_TOO_MANY_FILES', tier: 'publish', rule: 'At most 500 files published.' },
   { code: 'GAME_BUNDLE_FILE_TOO_LARGE', tier: 'publish', rule: 'At most 10 MB per published file.' },
