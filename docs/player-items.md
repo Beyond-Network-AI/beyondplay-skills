@@ -44,9 +44,9 @@ import type { PlayerItem } from './beyondplay-platform';
 // The collection's default item, as get_contract serves it in capabilities[].default
 // for 'cobi'. Copy it here so the game renders the same bull with no host answer.
 const DEFAULT_BULL: PlayerItem = {
-  id: 'cobi:default', collection: 'cobi', tokenId: 'default', name: 'Cobi',
-  image: 'https://assets.beyondplay.xyz/cobi/images/default.webp',
-  traits: { Fur: 'Base', Eyes: 'Normal' },
+  id: 'cobi:default', collection: 'cobi', tokenId: null, name: 'COBI',
+  image: 'https://assets.beyondplay.xyz/cobi/default/image.webp',
+  traits: { Fur: 'Robot', Hooves: 'Classic', Eyes: 'Sunglasses', Horns: 'Upward', Clothes: 'Black Jeans' },
   model: {
     kind: 'kit', kit: 'cobi/v2', base: 'https://assets.beyondplay.xyz/cobi/kit/v2/phone/',
     clips: 'https://assets.beyondplay.xyz/cobi/kit/v2/anim-bull.glb', clipNames: ['idle', 'walk', 'run', 'jump'],

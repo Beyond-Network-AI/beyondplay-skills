@@ -96,7 +96,8 @@ export interface PlayerItem {
   id: string;
   /** The collection slug the game declared ('cobi'). */
   collection: string;
-  tokenId: string;
+  /** null only on the collection's default item (no token), as get_contract serves it. */
+  tokenId: string | null;
   /** The item's display name ('Cobi #5759'), for the end card or a greeting. */
   name: string;
   /** An image of the item on the platform's asset host; the avatar path for 2D games. */
