@@ -232,6 +232,44 @@ mode the rAF loop draws but does not step. The seed check runs the same
 scripted schedule twice and compares `hash`, `score` and `plan`. Reference
 implementation: `template/src/App.tsx` and `template/src/game.ts`.
 
+`perf()` is optional and game-owned, so it needs no change to a
+platform-owned file. A three.js game returns the last drawn frame's numbers
+from its own renderer, which it already holds in `App.tsx`:
+
+```ts
+// with @react-three/fiber, inside the Canvas: const gl = useThree((s) => s.gl)
+perf: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
+```
+
+`renderer.info` resets at the start of each render by default, so read it
+between frames, as the hook does when the smoke calls it. A game that draws
+in several passes per frame (a post effect, a second scene) sets
+`renderer.info.autoReset = false` and calls `renderer.info.reset()` at the
+top of its frame. A 2D game leaves `perf` out.
+
+## 6a. Performance
+
+Measured by `npm run smoke:perf` and, when its build image has a browser, by
+the hosted check, on a mid-range phone stand-in: a 390 x 844 portrait
+viewport at one device pixel per CSS pixel, the CPU throttled four times
+through the Chrome DevTools Protocol, the game embedded in a parent page and
+played through `smoke.driver.mjs` in real time (the recorded run replayed at
+the driver's `stepsPerSecond`, default 60).
+
+| Measure | Budget | Code (tier) |
+|---|---|---|
+| Time to first frame: `bp_ready` at the parent or the first drawn canvas, from navigation | 5 s | `GAME_SLOW_FIRST_FRAME` (listing) |
+| 95th percentile frame time over ten seconds of driven play | 33 ms (a 30 fps floor; 60 fps is the target) | `GAME_FRAME_TIME` (listing) |
+| Draw calls per frame, the most seen, from `__bpTest.perf()` | 60 | `GAME_DRAW_CALLS` (listing) |
+| Triangles per frame, the most seen, from `__bpTest.perf()` | 300,000 | `GAME_TRIANGLES` (listing) |
+| JavaScript heap after a minute of play | informational | `GAME_HEAP` (review, info) |
+
+Listing tier: the game may publish unlisted with a finding; the reviewer's
+approve waits until the submission check carries none. Draw calls and
+triangles are judged only for a game whose hook exposes `perf()`. The
+numbers, the thresholds and each finding's fix live in
+`tools/beyondplay-check/src/perf.js`; the hosted check copies that file.
+
 ## 7. Build configuration
 
 `vite.config.ts` (each game carries the template's copy):

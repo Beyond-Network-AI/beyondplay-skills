@@ -92,6 +92,9 @@ already playing.
   no boot task blocks for more than about a second; aim for a median of
   45 fps under 4x CPU throttle in headless Chromium where a GPU exists.
 - Prefer Canvas 2D. Add a framework or a dependency only when truly needed.
+- `npm run smoke:perf` measures the first frame, the frame time, draw calls,
+  triangles and the heap on a throttled phone stand-in (`smoke-ladder.md`,
+  section 6); a three.js game exposes its numbers through `__bpTest.perf()`.
 
 ## Determinism on the main thread
 

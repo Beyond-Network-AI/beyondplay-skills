@@ -172,6 +172,7 @@ npm run smoke:render -- games/<slug>    # -> RENDER-OK     pixels, a played run,
 npm run smoke:seed -- games/<slug>      # -> DETERMINISTIC same seed, same run
 npm run conformance -- games/<slug>     # -> CONFORMANT    declaration matches behaviour and dist
 npm run smoke:idle -- games/<slug>      # -> IDLE-OK       an untouched run survives 12 s
+npm run smoke:perf -- games/<slug>      # -> PERF-OK       first frame, frame time, draw calls, heap on a throttled phone
 npm run typecheck -- games/<slug>       # -> TYPECHECK-OK  strict TypeScript
 ```
 
@@ -280,8 +281,9 @@ Breaking any of these ships a broken game or a rejected one.
 | Item | Limit | Checked by |
 |---|---|---|
 | Bundle | well under 1 MB gzipped (the scaffold ships about 51 KB) | `npm run check` warns above it |
-| Frame rate | 60 fps on a mid-range iPhone; one canvas; no per-frame allocations | reviewers, on a phone |
-| 3D scene | at most 60 draw calls and 300k triangles with the character loaded | your own `__bpTest.perf()` |
+| First frame | within 5 s on a phone stand-in (four times CPU throttling) | `npm run smoke:perf`, the hosted check |
+| Frame rate | 60 fps on a mid-range iPhone; the 95th percentile frame at or under 33 ms on the stand-in; one canvas; no per-frame allocations | `npm run smoke:perf`, the hosted check, reviewers on a phone |
+| 3D scene | at most 60 draw calls and 300k triangles with the character loaded | `npm run smoke:perf` through `__bpTest.perf()`, the hosted check |
 | Idle | an untouched run is still playing at 12 s | `npm run smoke:idle` |
 | Haptics | at most 400 `bp_haptic` messages in one run | reviewers |
 | Initial download | at most 20 MB on phones | `npm run check`, the hosted check |
