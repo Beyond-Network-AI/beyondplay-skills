@@ -184,8 +184,11 @@ keys: { move: 'arrows|wasd', jump: 'space' } })` emits:
 | `input` | `decl.input` with duplicates removed, else `['touch', 'mouse']` |
 | `keys` | `decl.keys` (a copy), else `{}` |
 
-The kit fills defaults and nothing else: a bad value stays in the manifest so
-the validator can name it (`DISPLAY_*`, `docs/display.md` section 8). Hosts
+The kit fills defaults and nothing else: a declared value of the right type
+stays in the manifest as written, so the validator can name a bad one
+(`DISPLAY_*`, `docs/display.md` section 8); a missing field, or one of the
+wrong type (an `input` that is not a list, `keys` that are not an object, a
+null `orientation`), gets its default. Hosts
 read it through `normalizeDisplay` (`tools/beyondplay-check/src/game-display.js`;
 the semantics and vectors are in `docs/display.md` section 5), and the report
 records the result as `facts.display`.

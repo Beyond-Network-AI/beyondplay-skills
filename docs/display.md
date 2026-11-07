@@ -50,8 +50,11 @@ declaration with the defaults filled (`GameDisplay`), for the shell:
 `import { display } from './beyondplay.config'`, then
 `bindKeys(display.keys, ...)` (section 6). It touches nothing at import time.
 
-The kit keeps what you declare as it is, apart from filling the defaults and
-removing duplicate input kinds, so the validator can name a bad value.
+The kit keeps a declared value of the right type as it is, apart from
+filling the defaults and removing duplicate input kinds, so the validator can
+name a bad one. A missing field, or one of the wrong type (an `input` that is
+not a list, `keys` that are not an object, a null `orientation`), gets its
+default.
 
 Before you declare it, read section 9: the hosted build has to accept it.
 
@@ -180,9 +183,15 @@ const unbind = bindKeys(display.keys, {
 // on unmount: unbind();
 ```
 
-A key goes to the first verb that lists it and has a handler. Auto-repeat and
-Ctrl, Meta or Alt chords are ignored, a bound key's default action is
-prevented, and losing focus releases every held key. Apply a key like a tap:
+A key goes to the first verb that lists it and has a handler. Every keydown
+of a bound key has its default action prevented, auto-repeats included (a
+held arrow never scrolls the page around the game), but the handler hears
+only the first keydown of a press and its keyup. A press is released by its
+physical key, so Shift pressed mid-hold cannot leave a digit stuck. Ctrl,
+Meta and Alt chords, and keys typed into a text field (input, textarea,
+select, an editable element), are left alone; a focused button is not a
+field, so Space still reaches the verb. Losing focus releases every held
+key. Apply a key like a tap:
 on the next simulation step, from the shell, never from `src/game.ts`.
 `keysOf(spec)` reads the grammar of section 4; a test bundles it and compares
 it with the validator's `parseKeySpec`.
@@ -231,6 +240,8 @@ The smokes:
   first. It ends `RENDER-OK (portrait, landscape)`.
 - `npm run smoke:keys -- games/<slug>` proves the declared keys. A game
   without `keyboard` passes at once (`KEYS-OK: no keyboard declared`).
+  A dist without `display` for a game on the template's kit was built before
+  `defineDisplay`: `smoke:keys` and `smoke:render` fail on it (rebuild).
   Otherwise it opens the game top-level at the stage viewport (1280 x 720, or
   390 x 844 for a portrait game) under `?bp_test=1`, and for each verb plays
   the same run from `reset()` twice without the key and once with it held for

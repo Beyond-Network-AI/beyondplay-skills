@@ -184,7 +184,9 @@ is a dead card.
 
 ## 6. `smoke:keys` (KEYS-OK)
 
-Reads `display` from `dist/beyondplay.json`. Without `'keyboard'` in `input` it
+Reads `display` from `dist/beyondplay.json`. A manifest without `display` for
+a game on the template's kit was built before `defineDisplay`: it fails
+(rebuild), as `smoke:render` does. Without `'keyboard'` in `input` it
 prints `KEYS-OK: no keyboard declared` and stops; with `'keyboard'` and no
 `keys` it fails. Otherwise it opens the game top-level (not in an iframe, so
 the document has focus) at the stage viewport (1280 x 720, or 390 x 844 for a
