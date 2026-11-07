@@ -268,7 +268,7 @@ describe('template src/keys.ts', () => {
   };
   const key = (k, extra = {}) => ({ key: k, repeat: false, ctrlKey: false, metaKey: false, altKey: false, prevented: false, preventDefault() { this.prevented = true; }, ...extra });
 
-  it('bindKeys calls the verb on down and up, once per press, and prevents the default', () => {
+  it('bindKeys calls the verb on down and up, once per press, and prevents the default on every keydown', () => {
     const t = fakeTarget();
     const calls = [];
     const on = { move: (down, e) => calls.push(['move', down, e?.key]), jump: (down) => calls.push(['jump', down]) };
@@ -276,8 +276,9 @@ describe('template src/keys.ts', () => {
 
     const down = t.fire('keydown', key('ArrowLeft'));
     expect(down.prevented).toBe(true);
-    t.fire('keydown', key('ArrowLeft', { repeat: true }));
-    t.fire('keydown', key('ArrowLeft'));
+    const repeat = t.fire('keydown', key('ArrowLeft', { repeat: true }));
+    const again = t.fire('keydown', key('ArrowLeft'));
+    expect([repeat.prevented, again.prevented]).toEqual([true, true]);
     t.fire('keyup', key('ArrowLeft'));
     t.fire('keydown', key('D'));
     t.fire('keyup', key('d'));
@@ -301,6 +302,30 @@ describe('template src/keys.ts', () => {
 
     unbind();
     expect([...t.listeners.keydown, ...t.listeners.keyup, ...t.listeners.blur]).toEqual([]);
+  });
+
+  it('bindKeys releases a press by its physical key, even when Shift changed the key while it was held', () => {
+    const t = fakeTarget();
+    const calls = [];
+    keys.bindKeys({ 'pick card': '1-3' }, { 'pick card': (down, e) => calls.push([down, e?.key]) }, t);
+    t.fire('keydown', key('1', { code: 'Digit1' }));
+    t.fire('keyup', key('!', { code: 'Digit1' }));
+    t.fire('keydown', key('1', { code: 'Digit1' }));
+    t.fire('keyup', key('1', { code: 'Digit1' }));
+    expect(calls).toEqual([[true, '1'], [false, '!'], [true, '1'], [false, '1']]);
+  });
+
+  it('bindKeys leaves keys typed into a text field alone, but not a focused button', () => {
+    const t = fakeTarget();
+    const calls = [];
+    keys.bindKeys({ jump: 'space', fire: 'f' }, { jump: (down) => calls.push(['jump', down]), fire: (down) => calls.push(['fire', down]) }, t);
+    const typed = [{ tagName: 'INPUT' }, { tagName: 'textarea' }, { tagName: 'SELECT' }, { tagName: 'DIV', isContentEditable: true }]
+      .map((target) => t.fire('keydown', key('f', { target })));
+    expect(typed.map((e) => e.prevented)).toEqual([false, false, false, false]);
+    expect(calls).toEqual([]);
+    const onButton = t.fire('keydown', key(' ', { target: { tagName: 'BUTTON' } }));
+    expect(onButton.prevented).toBe(true);
+    expect(calls).toEqual([['jump', true]]);
   });
 
   it('bindKeys gives a key to the first verb that lists it and has a handler', () => {
