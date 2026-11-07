@@ -6,7 +6,11 @@
 // an edited copy is). The other files the template ships (vite.config.ts,
 // tsconfig.json, src/haptics.ts, src/index.css, src/webkit-image-hardening.ts,
 // src/cobi-kit.SOURCE.json) are not protected by the contract, so a
-// difference there is a warning (drift), not an error.
+// difference there is a warning (drift), not an error. Starter files are the
+// game's from the first commit and never compared: the Tap Timing game
+// (src/App.tsx, src/game.ts), the config, the smoke driver, and the viewport
+// and keyboard helpers (src/viewport.ts, src/keys.ts), which a game may edit
+// or delete and which games scaffolded before them do not have.
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +21,7 @@ export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit
 /** Contract files a game may ship without: added after the first games were scaffolded, so absence is drift, not an error. */
 export const OPTIONAL_CONTRACT_FILES = new Set(['src/cobi-kit.ts']);
 /** Starter files the template ships for the game to replace; never compared. */
-export const STARTER_FILES = new Set(['src/App.tsx', 'src/game.ts', 'src/beyondplay.config.ts', 'smoke.driver.mjs']);
+export const STARTER_FILES = new Set(['src/App.tsx', 'src/game.ts', 'src/beyondplay.config.ts', 'smoke.driver.mjs', 'src/viewport.ts', 'src/keys.ts']);
 
 const TITLE = /<title>[^<]*<\/title>/;
 const normalise = (rel, buf) => (rel === 'index.html' ? Buffer.from(buf.toString('utf8').replace(TITLE, '<title></title>')) : buf);

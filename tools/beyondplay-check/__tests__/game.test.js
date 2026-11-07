@@ -53,6 +53,14 @@ describe('beyondplay-check game', () => {
     expect(codes(r)).toContain('GAME_CONFIG_SOLO');
   });
 
+  it('treats the viewport and keyboard helpers as starter files: a game may edit or delete them', async () => {
+    rmSync(join(dir, 'src/keys.ts'));
+    writeFileSync(join(dir, 'src/viewport.ts'), readFileSync(join(dir, 'src/viewport.ts'), 'utf8') + '\nexport const EDITED = true;\n');
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.issues.filter((i) => i.path === 'src/keys.ts' || i.path === 'src/viewport.ts')).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+
   it('reports an oversized file against the 10 MB per-file limit', async () => {
     write(join(dir, 'assets/huge.bin'), Buffer.alloc(10 * MB + 1));
     const r = await checkGame(dir, { template: TEMPLATE });
