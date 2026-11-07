@@ -63,12 +63,18 @@ Game, errors: `GAME_CONFIG_MISSING`, `GAME_CONFIG_BUILD_FAILED`, `GAME_CONFIG_IN
 Game, warnings: `GAME_TEMPLATE_FILE_DRIFT`, `GAME_TEMPLATE_UNAVAILABLE`,
 `GAME_PUBLISH_CONFIG_MISSING`, `GAME_PUBLISH_SLUG_MISMATCH`, `GAME_ART_MISSING`,
 `GAME_TEST_HOOK_UNGATED`, `GAME_SHARE_BUTTON`, `GAME_START_GATE`, `GAME_INSTRUCTION_TEXT`,
-`GAME_CAPABILITY_UNKNOWN`, `GAME_CAPABILITY_UNDECLARED` (listing-tier errors locally),
+`GAME_CAPABILITY_UNKNOWN`, `GAME_CAPABILITY_UNDECLARED`, `GAME_ITEM_IN_SIMULATION` (listing-tier errors locally),
 `GAME_MOUSE_TOUCH_EVENTS`, `GAME_VIEWPORT_100VH`, `GAME_DIRECT_LEADERBOARD`,
 `GAME_BUNDLE_OVER_TARGET`, `GAME_AUDIO_LICENCE_MISSING`, `GAME_SMOKE_DRIVER_MISSING`.
 
 Game, info: `GAME_CONFIG_SOLO`, `GAME_EXTERNAL_URL`, `GAME_WALL_CLOCK`, `GAME_DAILY_REWARD`,
 `GAME_NO_BUILD`, `GAME_INITIAL_DOWNLOAD`, `GAME_ART_BANNER_MISSING`.
+
+`player.items` is declared with its collection (`uses: ['player.items:cobi']`); a bare
+`player.items` is `GAME_CAPABILITY_UNDECLARED`, `player.items` or `PlayerItem` in
+`src/game.ts` is `GAME_ITEM_IN_SIMULATION`, and `GAME_ITEM_GATING` (review tier, no
+local check) is the reviewer's rule: items change how a run looks and sounds, never how
+it plays. Whether a collection slug is one the platform offers is not checked locally.
 
 Every issue also carries a `tier` from `src/rules.js`, the one table the local
 validator, the hosted check and the creator MCP share: `publish` (refused at upload and

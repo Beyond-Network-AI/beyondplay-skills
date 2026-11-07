@@ -11,6 +11,10 @@
 
 import type { CapabilityName } from './beyondplay-platform';
 
+/** One entry of `uses`: a capability name, or player.items with the one collection the game
+ *  asks for ('player.items:cobi'). The manifest carries the entries verbatim. */
+export type UsesEntry = CapabilityName | `player.items:${string}`;
+
 export type SortableSeed = boolean;
 export type InstanceKind = 'static' | 'daily' | 'random' | 'rotating';
 /** Forward-compat: v1 ships 'score_duel'. The match object + kit are mode-discriminated so
@@ -88,8 +92,10 @@ const __registry: { challenge: ChallengeDecl | null; playerMode: 'single' | 'due
 /** Declare the platform capabilities this game asks for through src/beyondplay-platform.ts
  *  (request('share'), request('player.profile'), ...). The manifest carries them as `uses`, so the
  *  reviewer and the player can see what the game asks for; the validator checks that every
- *  request() in the source is declared. defineSoloGame({ uses }) calls this for you. */
-export function declareUses(names: ReadonlyArray<CapabilityName | string>): void {
+ *  request() in the source is declared. player.items names its collection in the entry
+ *  ('player.items:cobi'); a bare 'player.items' declares nothing. defineSoloGame({ uses }) calls
+ *  this for you. */
+export function declareUses(names: ReadonlyArray<UsesEntry>): void {
   const seen = new Set(__registry.uses);
   for (const n of names) {
     if (typeof n !== 'string' || !n || seen.has(n)) continue;
@@ -132,8 +138,9 @@ export function defineChallengeBoard(decl: ChallengeDecl): ChallengeHandle {
 
 /** Declare a solo score game. Pass a defineChallenge() result to make it duel-able, or null
  *  (or omit) for a non-duel game. `uses` names the platform capabilities the game asks for
- *  (see src/beyondplay-platform.ts): defineSoloGame({ challenge, uses: ['share'] }). */
-export function defineSoloGame(opts?: { challenge?: ChallengeHandle | null; lowerIsBetter?: boolean; uses?: ReadonlyArray<CapabilityName> }) {
+ *  (see src/beyondplay-platform.ts): defineSoloGame({ challenge, uses: ['share'] }); a game that
+ *  shows the player's items names the collection: uses: ['share', 'player.items:cobi']. */
+export function defineSoloGame(opts?: { challenge?: ChallengeHandle | null; lowerIsBetter?: boolean; uses?: ReadonlyArray<UsesEntry> }) {
   const ch = opts?.challenge ?? null;
   if (!ch) __registry.playerMode = 'single';
   if (opts?.uses) declareUses(opts.uses);

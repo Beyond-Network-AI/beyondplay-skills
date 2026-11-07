@@ -18,8 +18,20 @@
 //   host             surface, locale, reducedMotion, authenticated, apiVersion
 //   player.profile   { displayName, handle, avatar } or null when signed out
 //   share            the host opens its share sheet with the game page and the score
+//
+// Phase 2 capabilities (open tier, answered without asking the player):
+//   player.items     the player's items in one declared collection (PlayerItem[]), null when
+//                    signed out, no wallet, opted out or not allowed, [] when they hold nothing;
+//                    declare the collection: uses: ['player.items:cobi']
+//   player.stats     { best, plays, lastPlayedAt } for this game, or null
+//   player.friends   [{ displayName, avatar, best }] for friends who played this game, or null
+//
+// The one rule for items: they change how a run looks and sounds, never how it
+// plays. A trait may pick the model, a trail, a sound, a greeting, the name on
+// the end card; nothing the simulation reads comes from an item or a trait.
+// Read items in src/App.tsx, never in src/game.ts.
 
-export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share';
+export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share' | 'player.items' | 'player.stats' | 'player.friends';
 
 export interface HostInfo {
   surface: 'feed' | 'page' | 'app' | 'telegram' | 'desktop' | 'unknown';
@@ -49,11 +61,85 @@ export interface ShareResult {
   outcome: 'shared' | 'copied';
 }
 
+/** A rigged character assembled at runtime from a platform-served kit (src/cobi-kit.ts loads it). */
+export interface KitModel {
+  kind: 'kit';
+  /** The kit this item is built with ('cobi/v2'); the loader refuses a base of another kit. */
+  kit: string;
+  /** The kit's base URL on the platform's asset host (the phone tier for games). */
+  base: string;
+  /** A GLB of animation clips that play on the kit's skeleton. */
+  clips: string;
+  /** The clip names in `clips` ('idle', 'walk', 'run', 'jump'). */
+  clipNames: string[];
+  /** The skeleton the kit and the clips share ('mixamo-65'). */
+  skeleton: string;
+  /** Height in metres when built. */
+  height: number;
+  /** The direction the model faces ('+z'). */
+  facing: string;
+  /** The y of the feet when built (0: feet on the ground). */
+  feetAt: number;
+}
+
+/** A finished model file the platform serves for this item. */
+export interface BakedModel {
+  kind: 'baked';
+  url: string;
+}
+
+export type ItemModel = KitModel | BakedModel;
+
+/** One item the player holds in the collection the game declared. Look and sound only. */
+export interface PlayerItem {
+  /** '<collection>:<tokenId>'. */
+  id: string;
+  /** The collection slug the game declared ('cobi'). */
+  collection: string;
+  tokenId: string;
+  /** The item's display name ('Cobi #5759'), for the end card or a greeting. */
+  name: string;
+  /** An image of the item on the platform's asset host; the avatar path for 2D games. */
+  image: string;
+  /** Trait type to value, as the collection publishes them ({ Fur: 'Gold', Horns: 'Fire' }). */
+  traits: Record<string, string>;
+  /** How to show the item in 3D, when the collection ships a model. */
+  model?: ItemModel;
+  /** True when the platform lent the item to the player; it looks the same. */
+  borrowed: boolean;
+  /** When a borrowed item goes back (ISO 8601). */
+  until?: string;
+  /** How many the player holds, for an ERC-1155 collection. */
+  quantity?: number;
+}
+
+export interface PlayerItemsParams {
+  /** The collection slug, the one declared in uses as 'player.items:<collection>'. */
+  collection: string;
+}
+
+/** The player's record in this game: what the leaderboard already shows. */
+export interface PlayerStats {
+  best: number | null;
+  plays: number;
+  lastPlayedAt: string | null;
+}
+
+/** A friend who played this game; no id, no items, no lookup by player. */
+export interface PlayerFriend {
+  displayName: string | null;
+  avatar: string | null;
+  best: number | null;
+}
+
 export interface CapabilityParams {
   capabilities: undefined;
   host: undefined;
   'player.profile': undefined;
   share: ShareParams;
+  'player.items': PlayerItemsParams;
+  'player.stats': undefined;
+  'player.friends': undefined;
 }
 
 export interface CapabilityResults {
@@ -61,6 +147,10 @@ export interface CapabilityResults {
   host: HostInfo;
   'player.profile': PlayerProfile | null;
   share: ShareResult;
+  /** null when signed out, no wallet linked, the player opted out or the game is not allowed to ask; [] when the wallet holds nothing in the collection. */
+  'player.items': PlayerItem[] | null;
+  'player.stats': PlayerStats | null;
+  'player.friends': PlayerFriend[] | null;
 }
 
 /** Why a request was not answered with a result. */

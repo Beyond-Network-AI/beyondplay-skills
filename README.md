@@ -15,6 +15,7 @@ This kit is everything the agent needs and nothing it does not:
 | `tools/beyondplay-check/` | The validator: the same rules, codes and limits as the platform's hosted check. |
 | `scripts/` | Scaffold, build, the browser checks, conformance, art rendering, packing. |
 | `docs/MCP.md` | Connecting to the creator MCP and what its tools do. |
+| `docs/player-items.md` | The player's own bull in a game: declare the collection, request the items, load a kit bull or draw the image, what is not allowed. |
 
 ## Quick start
 
@@ -71,6 +72,18 @@ the same run. One `challenge.submit(score)` per run. No network beyond the platf
 no wallet or token gating, no third-party brands without an agreement, every asset and
 track owned, CC0 or commercially licensed and named in `CREDITS.md`. The platform-owned
 files are never edited. The skill has the long form.
+
+A game can show the player's own bull. Declare the collection with the capability
+(`uses: ['share', 'player.items:cobi']`), ask the platform for the items in
+`src/App.tsx` (`request('player.items', { collection: 'cobi' })`), and fall back to
+the collection's default when the answer is `null` or empty. The platform hands over
+items (name, image, traits, a model the kit's `src/cobi-kit.ts` assembles), never a
+wallet, a chain or a balance; items change how a run looks and sounds, never how it
+plays. `docs/player-items.md` is the recipe.
+
+## Maintenance
+
+`npm run sync-cobi-kit -- <path to a beyondplay-games checkout>` brings the COBI loader (`library/characters/cobi.ts` there, the one copy) into `template/src/cobi-kit.ts` under a sync header and records its commit and SHA-256 in `template/src/cobi-kit.SOURCE.json`; `npm run sync-cobi-kit -- --check` confirms the copy still matches the record.
 
 ## Access
 

@@ -239,6 +239,19 @@ Breaking any of these ships a broken game or a rejected one.
   platform's: ask for them, never build them in.
 - No wallet, token or NFT gating. Holding an asset unlocks nothing; wallet
   operations belong to the host shell. Character traits are cosmetic only.
+- The player's own items come through the platform, never a wallet: declare
+  the one collection with the capability (`uses: ['share', 'player.items:cobi']`)
+  and ask for it in `src/App.tsx` with
+  `request('player.items', { collection: 'cobi' })`. The answer is `null` for
+  most plays (signed out, no wallet, opted out, not allowed) and `[]` when the
+  player holds nothing: fall back to the collection's default item silently,
+  with no copy about linking anything. Items and traits change how a run looks
+  and sounds (the model, a trail, a sound, a greeting, the name on the end
+  card), never how it plays; `player.items` never appears in `src/game.ts`.
+  `src/cobi-kit.ts` (platform-owned, ships with the template) builds a kit
+  bull from `item.model` and `item.traits`; a 2D game draws `item.image`.
+  The recipe is `docs/player-items.md`; the contract is
+  `references/contract.md` section 9.
 - No third-party brand names, characters or logos without a written partner
   agreement. A fan game made under such an agreement ends its description
   with the disclaimer the agreement prescribes, in the form "not affiliated
@@ -291,7 +304,7 @@ Breaking any of these ships a broken game or a rejected one.
 
 ## References
 
-- `references/contract.md`: config fields, manifest fields, the `window.BeyondPlay` SDK, messages, URL parameters, build config, `publish.config.json`, the capabilities a game may request.
+- `references/contract.md`: config fields, manifest fields, the `window.BeyondPlay` SDK, messages, URL parameters, build config, `publish.config.json`, the capabilities a game may request, player items.
 - `references/mobile-rules.md`: touch, viewport, the feed contract, preboot hold, performance, haptics, known iOS and CSP traps.
 - `references/smoke-ladder.md`: the static validator, the checks, what each asserts, how to read a failure.
 - `references/assets-and-audio.md`: free libraries, procedural audio, the music and licence rule, 3D pipeline notes.

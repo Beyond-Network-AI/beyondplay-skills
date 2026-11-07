@@ -44,6 +44,12 @@ const DAILY_REWARD = /daily (?:bonus|reward|gift|login|streak)|login bonus|once 
 const WALL_CLOCK = /\b(?:Date\.now|performance\.now)\s*\(/g;
 const GAME_OVER = /\.submit\s*\(|\.endRun\s*\(|BeyondPlay\??\.gameOver\s*\(/;
 const LEADERBOARD = /\.leaderboard\s*\(/;
+/** The simulation file the contract names; items never reach it (GAME_ITEM_IN_SIMULATION). */
+const SIMULATION_FILE = 'src/game.ts';
+const ITEM_IN_SIMULATION = /player\.items|PlayerItem/;
+/** The one capability whose `uses` entry names a collection: 'player.items:cobi'. */
+const COLLECTION_CAPABILITY = 'player.items';
+const COLLECTION_SLUG = /^[a-z0-9][a-z0-9-]*$/;
 
 export function textFiles(files, templateOwned) {
   return files.filter((f) => TEXT_EXT.has(ext(f.rel)) && !templateOwned.has(f.rel) && f.size <= MAX_TEXT_BYTES && !f.rel.includes('/vendor/') && !f.rel.startsWith('vendor/'));
@@ -71,6 +77,16 @@ export function scanSource(gameDir, files, templateOwned, report) {
   // The game-over contract: one finished-run report through the kit.
   if (!GAME_OVER.test(all)) {
     report.error('GAME_GAME_OVER_MISSING', 'src', 'No challenge.submit(score), game.endRun(score) or window.BeyondPlay?.gameOver() call found: the run is never reported.', 'Call challenge.submit(finalScore) exactly once when the run ends.', { docs: DOCS.contract });
+  }
+
+  // Items change how a run looks and sounds, never how it plays: the string player.items (or
+  // PlayerItem) in the simulation file is the listing-tier pointer (contract.md > 9. Player items).
+  const simulation = sources.find((s) => s.rel === SIMULATION_FILE);
+  if (simulation) {
+    const at = simulation.text.split('\n').findIndex((line) => ITEM_IN_SIMULATION.test(line));
+    if (at >= 0) {
+      report.error('GAME_ITEM_IN_SIMULATION', simulation.rel, `player.items (or PlayerItem) appears in ${SIMULATION_FILE}; the simulation never sees an item, so a duel replays the same for both players.`, 'Request items in src/App.tsx and keep what they decide (the model, a trail, a sound, the name on the end card) in the renderer; nothing the simulation reads comes from an item or a trait.', { line: at + 1, docs: DOCS.playerItems });
+    }
   }
 
   for (const s of sources) {
@@ -172,11 +188,26 @@ export function checkAudioLicence(gameDir, files, report) {
   report.warning('GAME_AUDIO_LICENCE_MISSING', audio[0].rel, `${audio.length} audio file${audio.length === 1 ? '' : 's'} shipped but no CREDITS.md (or LICENCE note) found in the game folder.`, 'Add a CREDITS.md naming each track: title, author, source and licence. The licence must allow commercial games (CC0 is the default; the creator attests to the list on submission).', { docs: DOCS.playbookAudio });
 }
 
+/** A `uses` entry split into the capability and, for player.items, its collection ('player.items:cobi'). */
+export function parseUse(entry) {
+  const i = entry.indexOf(':');
+  if (i < 0) return { name: entry, collection: null };
+  return { name: entry.slice(0, i), collection: entry.slice(i + 1) };
+}
+
 /**
  * The platform capabilities the game asks for (request('name') calls outside
  * the template-owned files): each must be one the contract lists and, when the
  * manifest is known, one the config declares in `uses`. The names are recorded
- * as the report fact `uses` so the hosted check and the reviewer see them.
+ * as the report fact `uses` so the hosted check and the reviewer see them;
+ * where the config declares a collection for a requested capability
+ * ('player.items:cobi'), the fact keeps the declared entry, so the reviewer
+ * sees which collection the game asks for. A request('player.items') is
+ * declared by any 'player.items:<slug>' entry; a bare 'player.items' declares
+ * no collection and is GAME_CAPABILITY_UNDECLARED. Whether a slug names a
+ * collection the platform offers cannot be checked locally (the registry lives
+ * on the platform; get_contract serves it, and the host answers denied for one
+ * the manifest does not declare), so only the slug's shape is checked here.
  */
 export function checkCapabilities(files, templateOwned, manifest, report) {
   const found = new Map();
@@ -191,20 +222,34 @@ export function checkCapabilities(files, templateOwned, manifest, report) {
     });
   }
   const names = [...found.keys()].sort();
-  report.fact('uses', names);
   // A manifest without `uses` declared nothing; no manifest at all (the hosted check) leaves the declaration to the build.
   const declared = manifest ? (Array.isArray(manifest.uses) ? manifest.uses.filter((u) => typeof u === 'string') : []) : null;
+  /** The collection entries the config declares, by capability ('player.items' -> ['player.items:cobi']). */
+  const collections = new Map();
+  for (const entry of declared ?? []) {
+    const { name, collection } = parseUse(entry);
+    if (collection === null || name !== COLLECTION_CAPABILITY) continue;
+    if (!collections.has(name)) collections.set(name, []);
+    collections.get(name).push(entry);
+  }
+  report.fact('uses', names.map((name) => (collections.has(name) ? collections.get(name) : [name])).flat());
   for (const name of names) {
     const at = found.get(name);
     if (!CAPABILITY_NAMES.includes(name)) {
       report.error('GAME_CAPABILITY_UNKNOWN', at.rel, `request('${name}') asks for a capability the contract does not list; the host answers it as unsupported.`, `Use one of: ${CAPABILITY_NAMES.join(', ')}. get_contract on the creator MCP serves the table with what each returns.`, { line: at.line, docs: DOCS.capabilities });
-    } else if (declared && !declared.includes(name)) {
+    } else if (declared && name === COLLECTION_CAPABILITY && !collections.has(name)) {
+      // A bare 'player.items' in uses names no collection; the host answers denied for one the manifest does not declare.
+      report.error('GAME_CAPABILITY_UNDECLARED', at.rel, `request('${name}') is used but ${declared.includes(name) ? `a bare '${name}' in uses names no collection` : 'uses carries no player.items:<collection> entry'}; declare the collection: uses: ['player.items:cobi'].`, `Declare the collection in src/beyondplay.config.ts (defineSoloGame({ challenge, uses: ['player.items:cobi'] })) and request('player.items', { collection: 'cobi' }) in src/App.tsx.`, { line: at.line, docs: DOCS.playerItems });
+    } else if (declared && name !== COLLECTION_CAPABILITY && !declared.includes(name)) {
       report.error('GAME_CAPABILITY_UNDECLARED', at.rel, `request('${name}') is used but the config does not declare it.`, `Add '${name}' to uses in src/beyondplay.config.ts: defineSoloGame({ challenge, uses: ['${name}'] }).`, { line: at.line, docs: DOCS.capabilities });
     }
   }
   if (declared) {
-    for (const name of declared) {
-      if (!CAPABILITY_NAMES.includes(name)) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${name}', which the contract does not list.`, `Declare only: ${CAPABILITY_NAMES.join(', ')}.`, { docs: DOCS.capabilities });
+    for (const entry of declared) {
+      const { name, collection } = parseUse(entry);
+      if (!CAPABILITY_NAMES.includes(name)) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${entry}', which the contract does not list.`, `Declare only: ${CAPABILITY_NAMES.join(', ')} (player.items with its collection: player.items:cobi).`, { docs: DOCS.capabilities });
+      else if (collection !== null && name !== COLLECTION_CAPABILITY) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${entry}'; only player.items takes a collection after the colon.`, `Declare '${name}' on its own.`, { docs: DOCS.capabilities });
+      else if (collection !== null && !COLLECTION_SLUG.test(collection)) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${entry}'; a collection slug is lowercase letters, digits and hyphens ('cobi').`, `Declare the slug as the platform lists it: get_contract on the creator MCP serves the collections offered to games.`, { docs: DOCS.playerItems });
     }
   }
   return names;

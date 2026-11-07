@@ -181,4 +181,66 @@ describe('beyondplay-check game', () => {
     const full = await checkGame(dir, { template: TEMPLATE });
     expect(issue(full, 'GAME_CAPABILITY_UNDECLARED')).toMatchObject({ path: 'src/App.tsx' });
   });
+
+  const ITEMS_REQUEST = "const items = await request('player.items', { collection: 'cobi' }).catch(() => null);";
+  const configWithUses = (uses) => `import { defineChallenge, defineSoloGame } from './beyondplay-kit';\nexport const challenge = defineChallenge({ metricLabel: 'Score', seed: true, minValue: 0, maxValue: 1500 });\nexport const game = defineSoloGame({ challenge, uses: ${uses} });\n`;
+
+  it('a declared collection satisfies request(\'player.items\'), and the fact keeps the declared entry', async () => {
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share', 'player.items:cobi']"));
+    append(join(dir, 'src/App.tsx'), ITEMS_REQUEST);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNKNOWN');
+    expect(codes(r)).not.toContain('GAME_ITEM_IN_SIMULATION');
+    expect(r.facts.uses).toEqual(['player.items:cobi', 'share']);
+    expect(r.ok).toBe(true);
+  });
+
+  it('a bare player.items in uses declares no collection', async () => {
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share', 'player.items']"));
+    append(join(dir, 'src/App.tsx'), ITEMS_REQUEST);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    const i = issue(r, 'GAME_CAPABILITY_UNDECLARED');
+    expect(i).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/App.tsx' });
+    expect(i.message).toContain("declare the collection: uses: ['player.items:cobi']");
+    expect(r.facts.uses).toEqual(['player.items', 'share']);
+    expect(r.ok).toBe(false);
+    // No player.items entry at all says the same.
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share']"));
+    const none = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(none, 'GAME_CAPABILITY_UNDECLARED').message).toContain("declare the collection: uses: ['player.items:cobi']");
+  });
+
+  it('a collection slug is checked for shape only; a colon on another capability is unknown', async () => {
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share', 'player.items:Not A Slug', 'player.profile:cobi']"));
+    append(join(dir, 'src/App.tsx'), ITEMS_REQUEST);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    const unknown = r.issues.filter((i) => i.code === 'GAME_CAPABILITY_UNKNOWN');
+    expect(unknown.map((i) => i.message)).toEqual(expect.arrayContaining([expect.stringContaining('player.profile:cobi'), expect.stringContaining('Not A Slug')]));
+    expect(unknown).toHaveLength(2);
+    expect(r.facts.uses).toEqual(['player.items:Not A Slug', 'share']);
+  });
+
+  it('without a manifest (the hosted check) a player.items request is recorded and left to the build', async () => {
+    append(join(dir, 'src/App.tsx'), ITEMS_REQUEST);
+    const r = await checkGame(dir, { template: TEMPLATE, skipConfig: true });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(r.facts.uses).toEqual(['player.items', 'share']);
+  });
+
+  it('player.items or PlayerItem in src/game.ts is a listing-tier error naming the line', async () => {
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share', 'player.items:cobi']"));
+    append(join(dir, 'src/App.tsx'), ITEMS_REQUEST);
+    const game = join(dir, 'src/game.ts');
+    const before = readFileSync(game, 'utf8').split('\n').length;
+    append(game, "export function speedFor(item: { traits: Record<string, string> }) { return item.traits.Fur === 'Gold' ? 2 : 1; } // from player.items");
+    const r = await checkGame(dir, { template: TEMPLATE });
+    const i = issue(r, 'GAME_ITEM_IN_SIMULATION');
+    expect(i).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/game.ts', line: before + 1 });
+    expect(i.message).toContain('src/game.ts');
+    expect(r.ok).toBe(false);
+    writeFileSync(game, readFileSync(game, 'utf8').replace('// from player.items', '// typed as PlayerItem'));
+    expect(issue(await checkGame(dir, { template: TEMPLATE }), 'GAME_ITEM_IN_SIMULATION')).toMatchObject({ line: before + 1 });
+  });
 });
