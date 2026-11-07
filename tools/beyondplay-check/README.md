@@ -34,7 +34,8 @@ usage or path error, `3` internal failure. `--json` prints one object:
   "issues": [
     { "code": "GAME_TEMPLATE_FILE_DRIFT", "severity": "warning", "path": "src/index.css", "line": 1,
       "message": "...", "remediation": "...", "docs": "beyondplay-skills skills/beyondplay-game/references/contract.md" }
-  ]
+  ],
+  "facts": { "uses": ["share"], "display": { "orientation": "portrait", "input": ["touch", "mouse"], "keys": {} } }
 }
 ```
 
@@ -77,6 +78,16 @@ Game, info: `GAME_CONFIG_SOLO`, `GAME_EXTERNAL_URL`, `GAME_WALL_CLOCK`, `GAME_DA
 `src/game.ts` is `GAME_ITEM_IN_SIMULATION`, and `GAME_ITEM_GATING` (review tier, no
 local check) is the reviewer's rule: items change how a run looks and sounds, never how
 it plays. Whether a collection slug is one the platform offers is not checked locally.
+
+Display (`defineDisplay` in the config, read from the manifest it produces; skipped when the
+config does not build and under the hosted `skipConfig`), errors: `DISPLAY_ORIENTATION_INVALID`,
+`DISPLAY_INPUT_UNKNOWN`, `DISPLAY_KEYS_INVALID`, `DISPLAY_KEYS_WITHOUT_KEYBOARD` (publish tier),
+`DISPLAY_INPUT_NO_POINTER` (listing tier). Warnings: `DISPLAY_ORIENTATION_LANDSCAPE`,
+`DISPLAY_KEYBOARD_NO_KEYS`, `DISPLAY_KEYBOARD_NO_HANDLER`. Info: `DISPLAY_KEYBOARD_UNDECLARED` (all
+three review tier). The report records the normalized display as the fact `display`, beside `uses`.
+`src/game-display.js` also holds the key-spec grammar (`parseKeySpec`) and `normalizeDisplay()`,
+which the smokes use and every host applies; the template's `src/keys.ts` reads the same grammar,
+and a test bundles it and compares the two. `docs/display.md` at the kit root is the recipe.
 
 Every issue also carries a `tier` from `src/rules.js`, the one table the local
 validator, the hosted check and the creator MCP share: `publish` (refused at upload and

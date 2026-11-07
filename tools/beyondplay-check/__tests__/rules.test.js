@@ -82,3 +82,39 @@ describe('checkConcept', () => {
     expect(r.blocking).toContain('cdn_assets');
   });
 });
+
+describe('the display rules', () => {
+  const TIERS = {
+    DISPLAY_ORIENTATION_INVALID: 'publish',
+    DISPLAY_INPUT_UNKNOWN: 'publish',
+    DISPLAY_KEYS_INVALID: 'publish',
+    DISPLAY_KEYS_WITHOUT_KEYBOARD: 'publish',
+    DISPLAY_INPUT_NO_POINTER: 'listing',
+    DISPLAY_ORIENTATION_LANDSCAPE: 'review',
+    DISPLAY_KEYBOARD_NO_KEYS: 'review',
+    DISPLAY_KEYBOARD_NO_HANDLER: 'review',
+    DISPLAY_KEYBOARD_UNDECLARED: 'review',
+  };
+
+  it('gives every DISPLAY_* code its tier, a rule and an alternative', () => {
+    expect(RULES.filter((r) => r.code.startsWith('DISPLAY_')).map((r) => r.code).sort()).toEqual(Object.keys(TIERS).sort());
+    for (const [code, tier] of Object.entries(TIERS)) {
+      expect(tierOf(code), code).toBe(tier);
+      expect(ruleFor(code).rule.length, code).toBeGreaterThan(20);
+      expect(typeof ruleFor(code).instead, code).toBe('string');
+    }
+  });
+
+  it('treats a keyboard or wide-screen concept as conditional, pointing at defineDisplay', () => {
+    const r = checkConcept({ description: 'a keyboard game for desktop' });
+    const v = r.verdicts.find((x) => x.feature === 'desktop');
+    expect(v).toMatchObject({ allowed: 'conditional', code: 'DISPLAY_INPUT_NO_POINTER', tier: 'listing' });
+    expect(v.verdict).toContain('one thumb in portrait');
+    expect(v.instead).toContain('defineDisplay(');
+    expect(r.blocking).toEqual([]);
+    for (const text of ['WASD controls', 'use the arrow keys', 'a landscape racer', 'widescreen view']) {
+      expect(checkConcept({ description: text }).verdicts.some((x) => x.feature === 'desktop'), text).toBe(true);
+    }
+    expect(r.always[0]).toBe('Portrait first, one thumb (a wide view and keys are additions, declared with defineDisplay), 30 to 90 second runs, one score, instant restart.');
+  });
+});

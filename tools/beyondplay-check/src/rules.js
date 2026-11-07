@@ -47,6 +47,16 @@ export const RULES = [
   { code: 'GAME_GAME_OVER_MISSING', tier: 'publish', rule: 'A finished run is reported exactly once through challenge.submit(score) or game.endRun(score).' },
   { code: 'GAME_MOUSE_TOUCH_EVENTS', tier: 'listing', rule: 'Pointer events only on phones.' },
   { code: 'GAME_VIEWPORT_100VH', tier: 'listing', rule: 'No 100vh; the iOS URL bar makes it jump.', instead: 'Use 100% or 100dvh.' },
+  // ── display (defineDisplay in the config; the manifest's `display`) ──────
+  { code: 'DISPLAY_ORIENTATION_INVALID', tier: 'publish', rule: 'display.orientation is \'portrait\', \'landscape\' or \'any\'.', instead: 'Omit orientation for a portrait game (the default); declare \'any\' when the view adapts to a wide screen too.' },
+  { code: 'DISPLAY_INPUT_UNKNOWN', tier: 'publish', rule: 'display.input is a non-empty list of the input kinds touch, mouse, keyboard and gamepad.', instead: 'Omit input for touch and mouse (the default), or list [\'touch\', \'mouse\', \'keyboard\'] when keys drive the game.' },
+  { code: 'DISPLAY_KEYS_INVALID', tier: 'publish', rule: 'display.keys maps at most 8 lower-case verbs to key specs in the grammar (docs/display.md); a key belongs to one verb, and Esc and Tab are the host\'s.', instead: 'keys: { move: \'arrows|wasd\', jump: \'space\' }, each verb named as the hint reads it (\'jump\', \'pick card\').' },
+  { code: 'DISPLAY_KEYS_WITHOUT_KEYBOARD', tier: 'publish', rule: 'Keys are declared only together with \'keyboard\' in display.input.', instead: 'input: [\'touch\', \'mouse\', \'keyboard\'], or drop keys when the game does not play with them.' },
+  { code: 'DISPLAY_INPUT_NO_POINTER', tier: 'listing', rule: 'display.input always lists \'touch\' and \'mouse\': every game plays with pointer events, and keys are an addition, never a replacement.', instead: 'input: [\'touch\', \'mouse\', \'keyboard\'].' },
+  { code: 'DISPLAY_ORIENTATION_LANDSCAPE', tier: 'review', rule: 'A landscape game cannot play in portrait, so the phone feed letterboxes it.', instead: 'Declare \'any\' when the view can adapt: one simulation, a view space per orientation (src/viewport.ts).' },
+  { code: 'DISPLAY_KEYBOARD_NO_KEYS', tier: 'review', rule: 'A game that lists \'keyboard\' names its keys, so the host has a key hint to show.', instead: 'keys: { move: \'arrows|wasd\', jump: \'space\' }.' },
+  { code: 'DISPLAY_KEYBOARD_NO_HANDLER', tier: 'review', rule: 'A game that lists \'keyboard\' binds the keys in its own source (bindKeys from src/keys.ts, or a keydown listener of its own).', instead: 'bindKeys(display.keys, { jump: (down) => ... }) from src/keys.ts; or drop \'keyboard\' and keys.' },
+  { code: 'DISPLAY_KEYBOARD_UNDECLARED', tier: 'review', rule: 'A game whose keys drive it declares them, so the host can show them; an incidental handler (an audio unlock, a debug key) is fine.', instead: 'defineDisplay({ input: [\'touch\', \'mouse\', \'keyboard\'], keys: { jump: \'space\' } }) in src/beyondplay.config.ts.' },
   // ── weight ───────────────────────────────────────────────────────────────
   { code: 'GAME_BUNDLE_OVER_TARGET', tier: 'listing', rule: 'The first-frame download stays well under 1 MB gzipped.', instead: 'Draw in code, load heavy assets after the first frame, compress models and textures.' },
   { code: 'GAME_INITIAL_DOWNLOAD_TOO_LARGE', tier: 'publish', rule: 'At most 20 MB before the first frame on a phone.' },
@@ -129,6 +139,7 @@ export const CONCEPT_RULES = [
   { id: 'multiplayer', match: /\b(?:real[- ]?time )?multiplayer\b|\bco-?op\b|\bpvp\b|\bversus\b|\bchat\b|\bvoice\b/i, allowed: 'conditional', code: 'GAME_DIRECT_LEADERBOARD', verdict: 'Live multiplayer and chat are not available to games; duels are asynchronous, same seed, best score.', instead: 'Declare a challenge; the platform runs the duel.' },
   { id: 'heavy_3d', match: /\b3d\b|\bthree\.?js\b|\bglb\b|\bgltf\b|\bmodels?\b|\btextures?\b/i, allowed: 'conditional', code: 'GAME_BUNDLE_OVER_TARGET', verdict: '3D is fine inside the budgets: well under 1 MB gzipped before the first frame, at most 20 MB total, 60 draw calls and 300k triangles with the character loaded.', instead: 'Draw in code where you can; compress and lazy-load models after the first frame.' },
   { id: 'audio', match: /\bmusic\b|\bsoundtrack\b|\bsong\b|\bsfx\b|\bsound effects?\b/i, allowed: 'conditional', code: 'GAME_AUDIO_LICENCE_MISSING', verdict: 'Audio is fine when it is owned, CC0 or commercially licensed and named in CREDITS.md, and it unlocks on a gesture.', instead: 'Procedural sound first; CC0 tracks named in CREDITS.md otherwise.' },
+  { id: 'desktop', match: /\b(?:desktop|keyboard|wasd|arrow keys|landscape|widescreen)\b/i, allowed: 'conditional', code: 'DISPLAY_INPUT_NO_POINTER', verdict: 'A large screen and keys are additions: the game stays playable with one thumb in portrait; a wide view and keys are declared with defineDisplay and the host shows them.', instead: "defineDisplay({ orientation: 'any', input: ['touch', 'mouse', 'keyboard'], keys: { move: 'arrows|wasd' } }) in src/beyondplay.config.ts, once get_contract's Display section no longer says \"Not yet\" (docs/display.md)" },
   { id: 'brands', match: /\bpokemon\b|\bmario\b|\bdisney\b|\bmarvel\b|\bfortnite\b|\bminecraft\b|\blicensed\b|\bbrand(?:ed|s)?\b|\bip\b/i, allowed: 'conditional', code: 'GAME_THIRD_PARTY_BRAND', verdict: 'No third-party brands, characters or logos without a written agreement; the platform\'s own characters are free to use.', instead: 'Use the platform\'s characters or your own.' },
 ];
 
@@ -152,7 +163,7 @@ export function checkConcept({ description = '', features = [] } = {}) {
     verdicts: fired,
     blocking: fired.filter((f) => f.allowed === false).map((f) => f.feature),
     always: [
-      'Portrait, one thumb, 30 to 90 second runs, one score, instant restart.',
+      'Portrait first, one thumb (a wide view and keys are additions, declared with defineDisplay), 30 to 90 second runs, one score, instant restart.',
       'Boots straight into play; an untouched run is still playing at 12 seconds.',
       'Same seed plus same inputs reproduce the same run (duels).',
       'One challenge.submit(score) or game.endRun(score) per run; the test hook under ?bp_test=1; a smoke.driver.mjs.',
