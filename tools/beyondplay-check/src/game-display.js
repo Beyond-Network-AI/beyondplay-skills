@@ -5,9 +5,9 @@
 // the smokes and the publisher trust) and the DISPLAY_* checks.
 //
 // Three implementations read the same rules and must agree: this one, the template's
-// src/keys.ts (keysOf; the parity test bundles it) and the arcade's lib/games/display.ts
-// (normalizeDisplay, keyHint). The publisher refuses a manifest that normalizeDisplay changes,
-// so the normalizers must give the same result.
+// src/keys.ts (keysOf; the parity test bundles it) and the platform's own reader of the
+// manifest (normalizeDisplay, keyHint). The publisher refuses a manifest that
+// normalizeDisplay changes, so the normalizers must give the same result.
 import { readFileSync } from 'node:fs';
 import { textFiles } from './game-scan.js';
 import { DOCS } from './limits.js';
