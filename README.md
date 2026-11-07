@@ -27,13 +27,24 @@ npm run browser                                   # Playwright's Chromium for th
 
 npm run new-game -- my-game "My Game"             # games/my-game, a complete playable game
 npm run dev -- games/my-game                      # http://localhost:5173
-npm run ladder -- games/my-game                   # validator, build, render, seed, conformance, idle, typecheck
+npm run ladder -- games/my-game                   # validator, build, render, seed, conformance, idle, perf, typecheck
 npm run render-icon -- games/my-game              # assets/icon.png from assets/icon-source.html
 npm run pack -- games/my-game                     # out/my-game.tar.gz for the MCP
 ```
 
 Node 20 or newer. On a machine without Playwright's download, point `CHROME_PATH` at
 any Chrome or Chromium binary.
+
+The ladder's steps, in order: the static validator (`PASS`), the build (`BUILD-OK`),
+the render smoke (`RENDER-OK`), the seed smoke (`DETERMINISTIC`), conformance
+(`CONFORMANT`), the idle smoke (`IDLE-OK`), the performance smoke (`PERF-OK`, or
+`PERF-WARN` with its findings) and the typecheck (`TYPECHECK-OK`). The performance smoke
+plays the game for a minute on a portrait phone viewport with the CPU throttled four
+times and reports the time to first frame (budget 5 s), the 95th percentile frame time
+(33 ms), draw calls and triangles for a three.js game that exposes `__bpTest.perf()`
+(60 and 300,000) and the heap; its findings are listing tier, so the ladder reports them
+and goes on (`--perf-strict` stops it). `skills/beyondplay-game/references/smoke-ladder.md`
+has what each step asserts.
 
 ## With Claude Code
 

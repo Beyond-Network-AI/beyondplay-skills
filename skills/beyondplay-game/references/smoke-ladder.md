@@ -5,7 +5,9 @@ hosted check the creator MCP runs (`start_build` and `get_build`).
 
 Every check prints one OK token on its last line and exits non-zero
 otherwise. `npm run ladder -- games/<slug>` runs them all in order and stops
-at the first failure. The local run is a fast doctor; the hosted run on
+at the first failure. The one exception is `smoke:perf`: its findings are
+listing tier, so it prints `PERF-WARN` with them and the ladder goes on
+(`--perf-strict` on the ladder, or `--strict` on the smoke, makes them stop it). The local run is a fast doctor; the hosted run on
 submission decides.
 
 | Order | Command | OK token | Failure prefix |
@@ -16,7 +18,8 @@ submission decides.
 | 3 | `npm run smoke:seed -- games/<slug>` | `DETERMINISTIC` | `SEED-FAIL:` |
 | 4 | `npm run conformance -- games/<slug>` | `CONFORMANT` | `CONFORMANCE-FAIL:` |
 | 5 | `npm run smoke:idle -- games/<slug>` | `IDLE-OK` | `IDLE-FAIL:` |
-| 6 | `npm run typecheck -- games/<slug>` | `TYPECHECK-OK` | tsc errors |
+| 6 | `npm run smoke:perf -- games/<slug>` | `PERF-OK` | `PERF-WARN:` (findings), `PERF-FAIL:` (could not measure) |
+| 7 | `npm run typecheck -- games/<slug>` | `TYPECHECK-OK` | tsc errors |
 
 The browser checks need Playwright's Chromium (`npm run browser`), or a
 `CHROME_PATH` pointing at any Chrome or Chromium binary. They serve
@@ -34,6 +37,7 @@ export default {
   minColors: 3,   // optional: distinct colours the pixel check needs (WebGL scenes: raise it)
   settleMs: 800,  // optional: wait before the pixel check
   allowZero: false, // optional: true when a finished run can honestly score 0
+  stepsPerSecond: 120, // optional: the engine's steps per second (1 / DT); the performance smoke replays at it (default 60)
 };
 ```
 
@@ -163,7 +167,40 @@ word ("again", "retry", "game over") inside the grace period fails it: the
 feed autoplays cards, and a card that dies before the viewer decides to play
 is a dead card.
 
-## 6. `typecheck` (TYPECHECK-OK)
+## 6. `smoke:perf` (PERF-OK)
+
+The built game on a mid-range phone stand-in: a 390 x 844 portrait viewport
+at one device pixel per CSS pixel, the CPU throttled four times through the
+DevTools protocol (`Emulation.setCPUThrottlingRate`), the game embedded in a
+same-origin parent page so the throttle reaches it. It measures:
+
+| Number | How | Budget | Code |
+|---|---|---|---|
+| Time to first frame | from the start of the game's navigation to `bp_ready` at the parent or the first canvas with more than one colour, whichever comes first | 5 s | `GAME_SLOW_FIRST_FRAME` (listing) |
+| Frame time | the 95th percentile of the intervals between animation frames over ten seconds of driven play | 33 ms, a 30 fps floor (frames land on refresh multiples, so exactly 33.3 ms passes) | `GAME_FRAME_TIME` (listing) |
+| Draw calls | the most in one frame during play, from `__bpTest.perf()` | 60 | `GAME_DRAW_CALLS` (listing) |
+| Triangles | the same | 300,000 | `GAME_TRIANGLES` (listing) |
+| Heap | the JavaScript heap after a minute of play, after a garbage collection | none yet | `GAME_HEAP` (info) |
+
+Driven play: the driver's `play()` steps the engine synchronously, so the
+smoke runs it once against a recording copy of the hook (each `tick` and each
+`<verb>AtStep` call, in order), resets, and replays the same inputs after the
+same number of ticks at the driver's `stepsPerSecond`, from
+`requestAnimationFrame`, while the game's own loop draws every frame. A run
+that ends before the window does is replayed from a reset. Draw calls and
+triangles are measured only when the hook has `perf()` (contract section 6:
+a three.js game returns `renderer.info.render`); a 2D game reports them as
+not exposed. `--seconds` and `--heap-seconds` shorten a local run;
+`--json` adds one `BP_PERF:` line with every number. The thresholds and the
+messages are `tools/beyondplay-check/src/perf.js`, the same file the hosted
+check uses.
+
+Reading a finding: the line names the number and the budget, and `Instead:`
+names the fix. Headless Chromium rasterises in software and has no GPU, so a
+number here is a floor for a phone, not a promise; a game well inside the
+budgets here is fine on a phone.
+
+## 7. `typecheck` (TYPECHECK-OK)
 
 `tsc --noEmit -p games/<slug>` with the kit's dependencies in scope. Strict
 TypeScript.
@@ -173,9 +210,13 @@ TypeScript.
 `start_build` on the creator MCP unpacks your archive under the limits, keeps
 the platform's own copies of the platform-owned files, runs the same build,
 the manifest emitter, the bundle checks and the conformance runner, and
-returns issues with the same codes and fixes. It does not yet run the browser
-checks (render, seed, idle); your local run is the proof for those, and a
-reviewer plays the game on a phone.
+returns issues with the same codes and fixes. When its build image carries a
+browser it also runs the render, seed, idle and performance checks and
+reports them with the codes above (`GAME_RENDER_SMOKE_FAILED`,
+`GAME_SEED_SMOKE_FAILED`, `GAME_IDLE_SMOKE_FAILED` and the performance codes,
+all listing tier) and the measured numbers; without one it says
+"no browser in this snapshot; performance not measured" and your local run
+is the proof. A reviewer plays the game on a phone either way.
 
 ## Screenshots and bots
 

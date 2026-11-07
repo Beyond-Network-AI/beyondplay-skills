@@ -6,15 +6,17 @@ limits, same issue shape, same codes. The hosted result is the one that counts;
 this one is the fast loop an agent runs before uploading.
 
 It is static. It reads the folder, bundles and evaluates the config, hashes the
-platform-owned files, scans the source, measures the build. It does not run the game: determinism, rendering and the
-idle rule are the browser checks' job (`scripts/smoke-*.mjs`).
+platform-owned files, scans the source, measures the build. It does not run the game: determinism, rendering, the
+idle rule and performance are the browser checks' job (`scripts/smoke-*.mjs`). `src/perf.js` holds the
+performance thresholds and maps measured numbers to issues (`GAME_SLOW_FIRST_FRAME`, `GAME_FRAME_TIME`,
+`GAME_DRAW_CALLS`, `GAME_TRIANGLES`, `GAME_HEAP`) for the performance smoke and the hosted check alike.
 
 ## Run
 
 ```bash
 npm install                                                   # at the kit root, once
 npm run check -- game  games/<slug> [--json] [--fail-level warning] [--template <dir>]
-npm test                                                      # vitest, 16 tests
+npm test                                                      # vitest
 ```
 
 Outside the kit: `node bin/beyondplay-check.mjs game <dir> --template <template dir>`

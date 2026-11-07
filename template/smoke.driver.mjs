@@ -5,6 +5,8 @@
 // two seeds and expects identical hashes for the same seed. If your game
 // cannot be played from the hook, these checks cannot pass.
 export default {
+  // The engine steps at 1/120 s; the performance smoke replays the run at this rate.
+  stepsPerSecond: 120,
   // A competent run: tap when the marker is at the centre of the zone.
   play(t) {
     for (let guard = 0; guard < 40; guard++) {
