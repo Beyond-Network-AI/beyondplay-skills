@@ -28,6 +28,10 @@ export XAI_API_KEY=...      # in your shell or a secrets manager, never in a cha
 npm run agent -- "a one-thumb game about catching falling fruit"
 ```
 
+The model runs the kit's whole ladder (validator, build, render, seed,
+conformance, idle, keys, perf, typecheck) until it prints `LADDER-OK`; the
+keys step passes at once for a game that declares no keyboard.
+
 Options, all optional:
 
 | Flag | Meaning |
@@ -51,7 +55,8 @@ play and change.
 - Read any file in the kit; write only inside `games/<slug>/`, never the
   platform-owned files.
 - Run only the kit's npm scripts (`new-game`, `ladder` and its steps,
-  `render-icon`, `render-banner`, `pack`) with plain arguments; no shell.
+  `smoke:keys` among them, `render-icon`, `render-banner`, `pack`) with plain
+  arguments; no shell.
 - Call the MCP tools, PUT files under `games/` or `out/` to the signed URLs the
   MCP hands out. `submit_for_review` only with `--submit`.
 - Spend at most `--steps` turns.

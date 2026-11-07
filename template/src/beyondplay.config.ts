@@ -18,3 +18,15 @@ export const challenge = defineChallenge({
 // A game that shows the player's bulls declares the collection with the capability
 // (docs/player-items.md): `uses: ['share', 'player.items:cobi']`.
 export const game = defineSoloGame({ challenge, uses: ['share'] });
+
+// Large screens and keys (docs/display.md). The defaults, portrait and
+// ['touch', 'mouse'], fit a one-thumb phone game and need no line here. A game
+// whose view adapts to a wide screen, or that also plays with keys, adds
+// defineDisplay to the import above and declares it. Keep it commented until
+// get_contract's Display section no longer says "Not yet": the hosted build
+// uses the platform's own copy of the kit, which gains defineDisplay then.
+// export const display = defineDisplay({
+//   orientation: 'any',                       // 'portrait' (default) | 'landscape' | 'any'
+//   input: ['touch', 'mouse', 'keyboard'],    // touch and mouse always; 'keyboard' when keys drive the game
+//   keys: { move: 'arrows|wasd', jump: 'space' },
+// });

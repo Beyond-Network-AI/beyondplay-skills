@@ -17,6 +17,7 @@
     "smoke:render": "node scripts/smoke-render.mjs",
     "smoke:seed": "node scripts/smoke-seed.mjs",
     "smoke:idle": "node scripts/smoke-idle.mjs",
+    "smoke:keys": "node scripts/smoke-keys.mjs",
     "smoke:perf": "node scripts/smoke-perf.mjs",
     "conformance": "node scripts/conformance.mjs",
     "ladder": "node scripts/ladder.mjs",

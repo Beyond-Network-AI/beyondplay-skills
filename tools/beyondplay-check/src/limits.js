@@ -33,4 +33,5 @@ export const DOCS = {
   playbookPublishing: 'beyondplay-skills skills/beyondplay-game/references/style.md > Store metadata',
   playbookAudio: 'beyondplay-skills skills/beyondplay-game/references/assets-and-audio.md',
   smoke: 'beyondplay-skills skills/beyondplay-game/references/smoke-ladder.md',
+  display: 'beyondplay-skills docs/display.md; skills/beyondplay-game/references/contract.md > 3. dist/beyondplay.json',
 };

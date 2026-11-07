@@ -1,6 +1,6 @@
 // Issue collection and the two output shapes: the JSON object and the readable report.
 //
-// JSON: { ok, target, counts: { error, warning, info }, issues: [{ code, severity, path, line?, message, remediation, docs? }], facts: { uses?: string[] } }
+// JSON: { ok, target, counts: { error, warning, info }, issues: [{ code, severity, path, line?, message, remediation, docs? }], facts: { uses?: string[], display?: { orientation, input, keys } } }
 // Codes are stable UPPER_SNAKE identifiers; `ok` is true when nothing at or above the fail level was found.
 
 import { tierOf } from './rules.js';

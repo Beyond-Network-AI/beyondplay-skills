@@ -4,6 +4,7 @@ import { challenge } from './beyondplay.config';
 import { getMatch } from './beyondplay-kit';
 import { haptic } from './haptics';
 import { can, onCapabilities, request } from './beyondplay-platform';
+import { fitDesign, watchViewport } from './viewport';
 
 // The shell: one canvas, a HUD, an end card. It converts real time into whole
 // engine steps and draws; it never decides gameplay. Replace the drawing and
@@ -98,22 +99,18 @@ export default function App() {
     };
     canvas.addEventListener('pointerdown', onPointerDown);
 
-    // Fit the design space to the viewport (letterboxed), device pixel ratio capped at 2.
+    // Fit the design space to the viewport (letterboxed), device pixel ratio capped at 2 (src/viewport.ts).
     const view = { scale: 1, offX: 0, offY: 0 };
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-      view.scale = Math.min(w / DESIGN_W, h / DESIGN_H) * dpr;
-      view.offX = (canvas.width - DESIGN_W * view.scale) / 2;
-      view.offY = (canvas.height - DESIGN_H * view.scale) / 2;
-    };
-    resize();
-    window.addEventListener('resize', resize);
+    const unwatchViewport = watchViewport((v) => {
+      canvas.width = Math.round(v.w * v.dpr);
+      canvas.height = Math.round(v.h * v.dpr);
+      canvas.style.width = `${v.w}px`;
+      canvas.style.height = `${v.h}px`;
+      const fit = fitDesign(v, { w: DESIGN_W, h: DESIGN_H });
+      view.scale = fit.scale;
+      view.offX = fit.offX;
+      view.offY = fit.offY;
+    });
 
     const draw = (dtSec: number) => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -190,7 +187,7 @@ export default function App() {
     return () => {
       cancelAnimationFrame(raf);
       canvas.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('resize', resize);
+      unwatchViewport();
     };
   }, []);
 

@@ -8,6 +8,8 @@
 // WANT richer in-game duel UI, read getMatch() for the opponent's score-to-beat + metric, call
 // challenge.progress(score) on the way up to animate it, and subscribe with onMatchResult(cb) for
 // the outcome. All optional — a game that only calls submit(score) still gets the native strip.
+//
+// Display: defineDisplay() declares orientation, input and keys (docs/display.md).
 
 import type { CapabilityName } from './beyondplay-platform';
 
@@ -83,10 +85,11 @@ const DEFAULT_BOARD = 'highscores';
 
 // Module-level registry the manifest emitter reads after importing beyondplay.config.ts (Node).
 // define* only RECORDS here (pure) — nothing touches window at import time.
-const __registry: { challenge: ChallengeDecl | null; playerMode: 'single' | 'duel'; uses: string[] } = {
+const __registry: { challenge: ChallengeDecl | null; playerMode: 'single' | 'duel'; uses: string[]; display: DisplayDecl | null } = {
   challenge: null,
   playerMode: 'single',
   uses: [],
+  display: null,
 };
 
 /** Declare the platform capabilities this game asks for through src/beyondplay-platform.ts
@@ -161,6 +164,57 @@ export function defineSoloGame(opts?: { challenge?: ChallengeHandle | null; lowe
   };
 }
 
+// ── Display: how the game wants to be shown and played on a big screen ───────────────────────────
+// Portrait first: the defaults (portrait, ['touch', 'mouse']) fit every one-thumb phone game, so a game
+// that declares nothing keeps them. The manifest carries the result as `display`; the platform's hosts
+// read it (the stage shape on a large screen, the input chips, the key hint). Records only; nothing
+// touches window.
+
+/** 'portrait' (default): a phone game. 'any': the view adapts to a wide screen too (one simulation, a
+ *  view per orientation). 'landscape': cannot play in portrait (the phone feed letterboxes it). */
+export type Orientation = 'portrait' | 'landscape' | 'any';
+/** Pointer events make every game touch- and mouse-playable, so both are always listed; add 'keyboard'
+ *  when keys drive the game. 'gamepad' is reserved. */
+export type InputKind = 'touch' | 'mouse' | 'keyboard' | 'gamepad';
+/** The declaration; every field optional. */
+export interface DisplayDecl {
+  orientation?: Orientation;
+  input?: InputKind[];
+  /** verb -> key spec: { move: 'arrows|wasd', jump: 'space' }. Grammar: docs/display.md. */
+  keys?: Record<string, string>;
+}
+/** The declaration with the defaults filled: what the manifest carries as `display`. */
+export interface GameDisplay {
+  orientation: Orientation;
+  input: InputKind[];
+  keys: Record<string, string>;
+}
+export const DEFAULT_DISPLAY: Readonly<GameDisplay> = { orientation: 'portrait', input: ['touch', 'mouse'], keys: {} };
+
+/** Defaults filled, input deduped; declared values otherwise kept as they are, so the validator can name a bad one. */
+function filledDisplay(decl: DisplayDecl | null): GameDisplay {
+  const d = decl ?? {};
+  return {
+    orientation: d.orientation ?? DEFAULT_DISPLAY.orientation,
+    input: Array.isArray(d.input) ? [...new Set(d.input)] : [...DEFAULT_DISPLAY.input],
+    keys: d.keys && typeof d.keys === 'object' ? { ...d.keys } : {},
+  };
+}
+
+/** Declare how the game is shown and played (src/beyondplay.config.ts):
+ *    export const display = defineDisplay({ orientation: 'any', input: ['touch', 'mouse', 'keyboard'],
+ *                                           keys: { move: 'arrows|wasd', jump: 'space' } });
+ *  Returns the filled declaration for the shell (bindKeys(display.keys, ...) in src/keys.ts). */
+export function defineDisplay(decl: DisplayDecl = {}): GameDisplay {
+  __registry.display = decl;
+  return filledDisplay(decl);
+}
+
+/** Every manifest carries `display` (the defaults when the config declares nothing). */
+function withDisplay<T extends object>(manifest: T): T & { display: GameDisplay } {
+  return { ...manifest, display: filledDisplay(__registry.display) };
+}
+
 /** The shared seeded duel instance for this play — seed your RNG from match.seed so both players get
  *  identical content, and read match.opponentScore / match.metricLabel to render your own duel UI.
  *  Returns null for a normal (non-duel) play. */
@@ -187,7 +241,7 @@ export function onMatchResult(cb: (result: MatchResult) => void): () => void {
 /** Build the beyondplay.json manifest from the declared kit calls. Called by scripts/emit-manifest.mjs
  *  at build (in Node) after importing beyondplay.config.ts. Maps the declaration to a ChallengeUnit. */
 export function buildManifest() {
-  return withUses(buildDuelManifest());
+  return withUses(withDisplay(buildDuelManifest()));
 }
 
 /** The capabilities the config declared (declareUses / defineSoloGame({ uses })), when any. */
