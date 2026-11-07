@@ -15,7 +15,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { NAMED_KEYS, normalizeDisplay, parseKeySpec } from '../tools/beyondplay-check/src/game-display.js';
 import { resolveGame as resolveKitGame } from './kit.mjs';
 
@@ -59,6 +59,29 @@ export function readDisplay(dist) {
   } catch {
     return normalizeDisplay(undefined);
   }
+}
+
+const TEMPLATE_KIT = fileURLToPath(new URL('../template/src/beyondplay-kit.ts', import.meta.url));
+
+/**
+ * Why the built manifest cannot stand for the game's display, or null when it can. The template's kit
+ * always writes `display`, so a game on that kit whose dist/beyondplay.json has none was built before
+ * defineDisplay: read as the defaults (portrait, no keyboard) it would pass the smokes without playing
+ * what the config declares. A game on another kit, or on none (a prebuilt wrapper), reads as the defaults.
+ */
+export function staleDisplay(gameDir, dist) {
+  const file = join(dist, 'beyondplay.json');
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+  if (!manifest || typeof manifest !== 'object' || 'display' in manifest) return null;
+  const kit = join(gameDir, 'src', 'beyondplay-kit.ts');
+  if (!existsSync(kit) || !existsSync(TEMPLATE_KIT)) return null;
+  if (readFileSync(kit, 'utf8') !== readFileSync(TEMPLATE_KIT, 'utf8')) return null;
+  return `${file} has no display: rebuild the game (the build predates defineDisplay)`;
 }
 
 /** The smoke viewports, CSS pixels: a phone held upright and a laptop screen. */

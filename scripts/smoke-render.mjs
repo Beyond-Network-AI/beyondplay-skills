@@ -7,11 +7,13 @@
 //
 //   npm run smoke:render -- games/<slug>          (or games/<slug>/dist)
 import { startServer } from './serve-dist.mjs';
-import { launch, loadDriver, readDisplay, resolveGame, run, unexpectedFailures, viewportsFor } from './smoke-driver.mjs';
+import { launch, loadDriver, readDisplay, resolveGame, run, staleDisplay, unexpectedFailures, viewportsFor } from './smoke-driver.mjs';
 
 const { gameDir, dist, slug } = resolveGame(process.argv[2]);
 let where = '';
 const fail = (msg) => { console.error(`RENDER-FAIL:${where ? ` [${where}]` : ''}`, msg); process.exit(1); };
+const stale = staleDisplay(gameDir, dist);
+if (stale) fail(stale);
 const driver = await loadDriver(gameDir);
 const viewports = viewportsFor(readDisplay(dist));
 

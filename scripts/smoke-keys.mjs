@@ -24,11 +24,13 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { startServer } from './serve-dist.mjs';
-import { launch, loadDriverKeys, playwrightKey, readDisplay, resolveGame, run, stageViewport, unexpectedFailures } from './smoke-driver.mjs';
+import { launch, loadDriverKeys, playwrightKey, readDisplay, resolveGame, run, stageViewport, staleDisplay, unexpectedFailures } from './smoke-driver.mjs';
 
 const { gameDir, dist } = resolveGame(process.argv[2]);
 const fail = (msg) => { console.error('KEYS-FAIL:', msg); process.exit(1); };
 if (!existsSync(join(dist, 'beyondplay.json'))) fail(`${join(dist, 'beyondplay.json')} not found: build the game first`);
+const stale = staleDisplay(gameDir, dist);
+if (stale) fail(stale);
 
 const display = readDisplay(dist);
 if (!display.input.includes('keyboard')) {
