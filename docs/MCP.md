@@ -51,6 +51,13 @@ travels with the game; the report records the capabilities the game requests
 (`facts.uses`, with the collection for `player.items:cobi`), and `get_contract` serves
 the capability table.
 
+The manifest's `display` (`docs/display.md`) is how hosts lay the game out: the stage
+shape on a large screen, the input kinds and the key hint. The report records it,
+normalized, as `facts.display`. The hosted build accepts `defineDisplay` once
+`get_contract`'s Display section no longer says "Not yet"; until then keep the
+template's declaration commented. `get_contract` lists the `DISPLAY_*` rules with their
+tiers.
+
 ## The capabilities
 
 What a game may ask the platform for through `request(name, params)` from

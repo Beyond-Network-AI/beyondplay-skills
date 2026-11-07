@@ -16,6 +16,7 @@ This kit is everything the agent needs and nothing it does not:
 | `scripts/` | Scaffold, build, the browser checks, conformance, art rendering, packing. |
 | `docs/MCP.md` | Connecting to the creator MCP and what its tools do. |
 | `docs/player-items.md` | The player's own bull in a game: declare the collection, request the items, load a kit bull or draw the image, what is not allowed. |
+| `docs/display.md` | How a game is shown and played on a large screen: `defineDisplay` (orientation, input, keys), the key grammar, the viewport and key helpers, the checks. |
 
 ## Quick start
 
@@ -27,7 +28,7 @@ npm run browser                                   # Playwright's Chromium for th
 
 npm run new-game -- my-game "My Game"             # games/my-game, a complete playable game
 npm run dev -- games/my-game                      # http://localhost:5173
-npm run ladder -- games/my-game                   # validator, build, render, seed, conformance, idle, perf, typecheck
+npm run ladder -- games/my-game                   # validator, build, render, seed, conformance, idle, keys, perf, typecheck
 npm run render-icon -- games/my-game              # assets/icon.png from assets/icon-source.html
 npm run pack -- games/my-game                     # out/my-game.tar.gz for the MCP
 ```
@@ -36,15 +37,17 @@ Node 20 or newer. On a machine without Playwright's download, point `CHROME_PATH
 any Chrome or Chromium binary.
 
 The ladder's steps, in order: the static validator (`PASS`), the build (`BUILD-OK`),
-the render smoke (`RENDER-OK`), the seed smoke (`DETERMINISTIC`), conformance
-(`CONFORMANT`), the idle smoke (`IDLE-OK`), the performance smoke (`PERF-OK`, or
-`PERF-WARN` with its findings) and the typecheck (`TYPECHECK-OK`). The performance smoke
-plays the game for a minute on a portrait phone viewport with the CPU throttled four
-times and reports the time to first frame (budget 5 s), the 95th percentile frame time
-(33 ms), draw calls and triangles for a three.js game that exposes `__bpTest.perf()`
-(60 and 300,000) and the heap; its findings are listing tier, so the ladder reports them
-and goes on (`--perf-strict` stops it). `skills/beyondplay-game/references/smoke-ladder.md`
-has what each step asserts.
+the render smoke (`RENDER-OK`, once per orientation the game declares), the seed smoke
+(`DETERMINISTIC`), conformance (`CONFORMANT`), the idle smoke (`IDLE-OK`), the keys
+smoke (`KEYS-OK`: each declared key moves the run; at once for a game without
+keyboard), the performance smoke (`PERF-OK`, or `PERF-WARN` with its findings) and the
+typecheck (`TYPECHECK-OK`). The performance smoke plays the game for a minute on a
+portrait phone viewport with the CPU throttled four times and reports the time to first
+frame (budget 5 s), the 95th percentile frame time (33 ms), draw calls and triangles
+for a three.js game that exposes `__bpTest.perf()` (60 and 300,000) and the heap; its
+findings are listing tier, so the ladder reports them and goes on (`--perf-strict`
+stops it). `skills/beyondplay-game/references/smoke-ladder.md` has what each step
+asserts.
 
 ## With Claude Code
 
@@ -77,12 +80,13 @@ with an unlisted publish. `docs/AGENT.md` has the flags (`--offline`, `--no-publ
 
 ## The rules in one breath
 
-One config file (`src/beyondplay.config.ts`). Portrait, one thumb, 30 to 90 second
-runs, no title screen and no instruction text. Same seed plus same inputs reproduce
-the same run. One `challenge.submit(score)` per run. No network beyond the platform,
-no wallet or token gating, no third-party brands without an agreement, every asset and
-track owned, CC0 or commercially licensed and named in `CREDITS.md`. The platform-owned
-files are never edited. The skill has the long form.
+One config file (`src/beyondplay.config.ts`). Portrait first, one thumb (a wide view
+and keys are declared with `defineDisplay`), 30 to 90 second runs, no title screen and
+no instruction text. Same seed plus same inputs reproduce the same run. One
+`challenge.submit(score)` per run. No network beyond the platform, no wallet or token
+gating, no third-party brands without an agreement, every asset and track owned, CC0 or
+commercially licensed and named in `CREDITS.md`. The platform-owned files are never
+edited. The skill has the long form.
 
 A game can show the player's own bull. Declare the collection with the capability
 (`uses: ['share', 'player.items:cobi']`), ask the platform for the items in

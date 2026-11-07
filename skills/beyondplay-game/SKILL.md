@@ -21,7 +21,9 @@ Facts that shape every decision:
 - One config file: `src/beyondplay.config.ts`. The build emits
   `dist/beyondplay.json` from it. Nothing else declares the game to the platform.
 - Mobile first, portrait first, one thumb. Runs last 30 to 90 seconds, restart
-  is instant, and there is one clear score.
+  is instant, and there is one clear score. A wide view on a large screen and
+  keys are additions, declared with `defineDisplay` (`docs/display.md`); most
+  games declare nothing.
 - The feed is a swipe surface: the card is already playing when it scrolls in.
   No title screen, no tap-to-start, no instruction text.
 - Duels: the platform hands both players the same seed. Same seed plus same
@@ -168,10 +170,11 @@ or step by step:
 ```bash
 npm run check -- game games/<slug>      # -> PASS          static validator
 npm run check-build -- games/<slug>     # -> BUILD-OK      vite build + manifest, bundle shape
-npm run smoke:render -- games/<slug>    # -> RENDER-OK     pixels, a played run, one bp_game_over
+npm run smoke:render -- games/<slug>    # -> RENDER-OK     pixels, a played run, one bp_game_over, per declared orientation
 npm run smoke:seed -- games/<slug>      # -> DETERMINISTIC same seed, same run
 npm run conformance -- games/<slug>     # -> CONFORMANT    declaration matches behaviour and dist
 npm run smoke:idle -- games/<slug>      # -> IDLE-OK       an untouched run survives 12 s
+npm run smoke:keys -- games/<slug>      # -> KEYS-OK       each declared key moves the run (passes at once without keyboard)
 npm run smoke:perf -- games/<slug>      # -> PERF-OK       first frame, frame time, draw calls, heap on a throttled phone
 npm run typecheck -- games/<slug>       # -> TYPECHECK-OK  strict TypeScript
 ```
@@ -297,6 +300,7 @@ Breaking any of these ships a broken game or a rejected one.
 - [ ] `challenge.submit()` runs once per run; restart works from the in-page button and from `bp_play_again`
 - [ ] Boots into play; `bp_ready` fires once after the first draw; no how-to text; idle survives 12 s
 - [ ] Portrait screenshots inspected; text readable at phone size; canvas fills the viewport
+- [ ] If the game declares `any`: screenshots at 1280 x 720 inspected too
 - [ ] No external requests in the network log beyond the platform and the template's font
 - [ ] No brand names or third-party IP; fan disclaimer present where required; no emoji
 - [ ] Every asset and track is owned, CC0 or commercially licensed, and named in `CREDITS.md`; audio unlocks on a gesture
@@ -307,7 +311,7 @@ Breaking any of these ships a broken game or a rejected one.
 ## References
 
 - `references/contract.md`: config fields, manifest fields, the `window.BeyondPlay` SDK, messages, URL parameters, build config, `publish.config.json`, the capabilities a game may request, player items.
-- `references/mobile-rules.md`: touch, viewport, the feed contract, preboot hold, performance, haptics, known iOS and CSP traps.
+- `references/mobile-rules.md`: touch, viewport, orientation and devices, the feed contract, preboot hold, performance, haptics, known iOS and CSP traps.
 - `references/smoke-ladder.md`: the static validator, the checks, what each asserts, how to read a failure.
 - `references/assets-and-audio.md`: free libraries, procedural audio, the music and licence rule, 3D pipeline notes.
 - `references/style.md`: visual direction, palettes, motion, wording rules, store metadata.

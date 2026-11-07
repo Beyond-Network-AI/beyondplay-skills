@@ -14,7 +14,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 |---|---|---|
 | `index.html` | platform | Seed bootstrap, capability bridge and touch guard. Only `<title>` may change. |
 | `src/main.tsx` | platform | `window.BeyondPlay` shell, parent auth listener, WebKit image hardening, React mount of `./App`. |
-| `src/beyondplay-kit.ts` | platform | `defineChallenge`, `defineSoloGame`, `declareUses`, `getMatch`, `onMatchResult`, `buildManifest`. |
+| `src/beyondplay-kit.ts` | platform | `defineChallenge`, `defineSoloGame`, `declareUses`, `defineDisplay`, `DEFAULT_DISPLAY`, `getMatch`, `onMatchResult`, `buildManifest`. |
 | `src/beyondplay-platform.ts` | platform | `request`, `capabilities`, `can`, `onCapabilities`: the platform capabilities (section 9). Import it; do not edit it. |
 | `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
@@ -27,6 +27,8 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/App.tsx` | game | Mount, HUD, overlays. The scaffold's is the Tap Timing shell. |
 | `src/game.ts` | game | Deterministic engine. The scaffold's is the Tap Timing engine. |
 | `smoke.driver.mjs` | game | How the checks play the game. |
+| `src/viewport.ts` | game | Starter helper: `readViewport`, `fitDesign` (one design space, or one per orientation), `watchViewport`, `useViewport`. The scaffold's shell uses it. Edit or delete it. |
+| `src/keys.ts` | game | Starter helper: `bindKeys(display.keys, handlers)` and `keysOf(spec)`. Binds keys only; the host prints the key hints. Edit or delete it. |
 | `src/vite-env.d.ts` | game | Add `/// <reference types="vite/client" />` when importing images. |
 
 `scripts/emit-manifest.mjs` is shared by every game; `npm run build` calls it
@@ -43,6 +45,10 @@ lands on the declared board.
 import { defineChallenge, defineSoloGame } from './beyondplay-kit';
 export const challenge = defineChallenge({ /* fields below */ });
 export const game = defineSoloGame({ challenge });
+// optional, when the view adapts to a wide screen or keys play the game (add defineDisplay
+// to the import; see the hosted-build note under defineDisplay below):
+// export const display = defineDisplay({ orientation: 'any', input: ['touch', 'mouse', 'keyboard'],
+//                                        keys: { move: 'arrows|wasd', jump: 'space' } });
 ```
 
 ### `defineChallenge(decl)` fields
@@ -74,6 +80,19 @@ export const game = defineSoloGame({ challenge });
   `uses` names the platform capabilities the game asks for (section 9); the
   manifest carries them as `uses`.
 - `declareUses(names)`: the same declaration without `defineSoloGame`.
+- `defineDisplay(decl)`: how the game is shown and played on a large screen.
+  Every field is optional: `orientation` (`'portrait'`, the default; `'any'`
+  when the view adapts to a wide screen too; `'landscape'` when it cannot
+  play in portrait), `input` (default `['touch', 'mouse']`, which always
+  stay; add `'keyboard'` when keys drive the game; `'gamepad'` is reserved)
+  and `keys` (verb to key spec, `{ move: 'arrows|wasd', jump: 'space' }`; the
+  grammar is in `docs/display.md`). It only records the declaration for
+  `buildManifest()` and returns it with the defaults filled (`GameDisplay`),
+  so the shell can `import { display } from './beyondplay.config'` and
+  `bindKeys(display.keys, ...)` from `src/keys.ts`. Nothing touches `window`.
+  A game that declares nothing gets `DEFAULT_DISPLAY`. The hosted build
+  accepts it once `get_contract`'s Display section no longer says "Not yet";
+  until then keep it commented, as the template does.
 - `getMatch()`: the shared duel instance or `null` for a normal play. Fields:
   `seed`, `challengeId`, `mode` (`'score_duel'` in v1), `opponentScore`,
   `opponentName`, `metricLabel`, `lowerIsBetter`.
@@ -129,7 +148,8 @@ Duel game:
     "minValue": 0,
     "maxValue": 8000
   }],
-  "defaultUnitId": "highscores"
+  "defaultUnitId": "highscores",
+  "display": { "orientation": "portrait", "input": ["touch", "mouse"], "keys": {} }
 }
 ```
 
@@ -146,10 +166,33 @@ Derivation:
 | `valueFormat`, `aggregation`, `mode` | fixed: `INTEGER`, `best`, `score_duel` |
 
 Solo game with no challenge:
-`{ "playerMode": "single", "challenge": null, "defaultUnitId": null }`.
+`{ "playerMode": "single", "challenge": null, "defaultUnitId": null, "display": { ... } }`.
 
-If the config fails to build, the emitter writes the solo manifest with an
-`emitError` string and prints a boxed `MANIFEST EMIT FAILED` error.
+Every manifest carries `display`, after `defaultUnitId` and before `uses`
+(key order: `playerMode`, `challenge`, `defaultUnitId`, `display`, `uses`),
+with the defaults filled when the config declares nothing. A game declaring
+`defineDisplay({ orientation: 'any', input: ['touch', 'mouse', 'keyboard'],
+keys: { move: 'arrows|wasd', jump: 'space' } })` emits:
+
+```json
+"display": { "orientation": "any", "input": ["touch", "mouse", "keyboard"], "keys": { "move": "arrows|wasd", "jump": "space" } }
+```
+
+| `display` field | From |
+|---|---|
+| `orientation` | `decl.orientation`, else `'portrait'` |
+| `input` | `decl.input` with duplicates removed, else `['touch', 'mouse']` |
+| `keys` | `decl.keys` (a copy), else `{}` |
+
+The kit fills defaults and nothing else: a bad value stays in the manifest so
+the validator can name it (`DISPLAY_*`, `docs/display.md` section 8). Hosts
+read it through `normalizeDisplay` (`tools/beyondplay-check/src/game-display.js`;
+the semantics and vectors are in `docs/display.md` section 5), and the report
+records the result as `facts.display`.
+
+If the config fails to build, the emitter writes the solo manifest, with the
+default `display`, plus an `emitError` string and prints a boxed
+`MANIFEST EMIT FAILED` error.
 `check-build`, `conformance` and the hosted check all fail on `emitError`.
 Conformance also fails when `instanceKind` is `random` and `needsSeed` is
 `false`, and when the file on disk differs from what the config declares.

@@ -1,7 +1,9 @@
 # Mobile and feed rules
 
 Sources: the platform's feed-ready and haptics playbooks, the runtime
-gotchas met by the published games, `scripts/smoke-idle.mjs` and
+gotchas met by the published games, `docs/display.md`,
+`scripts/smoke-idle.mjs`, `scripts/smoke-keys.mjs`,
+`template/src/viewport.ts`, `template/src/keys.ts` and
 `template/src/webkit-image-hardening.ts` in this kit.
 
 Games live or die on phones. Every rule below has broken a shipped game once.
@@ -21,11 +23,12 @@ Games live or die on phones. Every rule below has broken a shipped game once.
 - Generous hit targets, one thumb, portrait first.
 - Instant response: apply a flick on the next simulation step.
 
-## Viewport and canvas
+## Viewport, orientation and devices
 
 - Design to a fixed logical space (flick-hoops uses 400 x 640) and scale it
   uniformly to `window.innerWidth` x `window.innerHeight`, centred, with the
   backing store multiplied by `devicePixelRatio` capped at 2.
+  `template/src/viewport.ts` does this: `fitDesign(readViewport(), { w, h })`.
 - Full-bleed: the canvas CSS size equals the window, and the background is
   painted out to the edges beyond the logical space, so no bars show. Check
   that the canvas bounds match the viewport within 2 px at 393 x 852 and at
@@ -36,6 +39,30 @@ Games live or die on phones. Every rule below has broken a shipped game once.
 - The template CSS disables text selection, tap highlights and zoom. Do not
   undo it.
 - Text at phone size: minimum 12 px; the score is readable at arm's length.
+- Portrait first; a large screen is an addition. A game may declare how it is
+  shown and played there in `src/beyondplay.config.ts`:
+  `export const display = defineDisplay({ orientation, input, keys })`. The
+  defaults (`portrait`, `['touch', 'mouse']`, no keys) fit a one-thumb phone
+  game, so most games declare nothing. The manifest always carries `display`
+  and the hosts read it to lay the game out (`docs/display.md`). The hosted
+  build accepts it once `get_contract`'s Display section no longer says
+  "Not yet".
+- `portrait` when the logical space is portrait. `any` only when the view
+  adapts (camera or field of view per aspect, HUD per aspect) and the render
+  smoke passes at 1280 x 720 as well as 390 x 844. `landscape` only when the
+  game cannot play in portrait (a warning: the feed letterboxes it).
+- The `any` rule: one simulation, one view space per orientation
+  (`fitDesign(v, { portrait, landscape })`). Fill every aspect between 9:19.5
+  and 21:9, painted to the edges; letterbox beyond that. HUD anchored to the
+  edges with `env(safe-area-inset-*)`. The simulation never reads the
+  viewport: a player on a phone and one on a large screen duel on the same
+  world.
+- Keys are an addition, never a replacement: pointer events stay the input on
+  every device. Add `'keyboard'` to `input` only when keys really drive the
+  game, and map each verb to its keys (`keys: { move: 'arrows|wasd', jump:
+  'space' }`; the grammar is in `docs/display.md`). Bind them with
+  `bindKeys(display.keys, ...)` from `src/keys.ts`. Never print a key hint in
+  the game; the host prints it. Esc and Tab belong to the host.
 
 ## The feed contract
 
@@ -94,7 +121,7 @@ already playing.
 - Prefer Canvas 2D. Add a framework or a dependency only when truly needed.
 - `npm run smoke:perf` measures the first frame, the frame time, draw calls,
   triangles and the heap on a throttled phone stand-in (`smoke-ladder.md`,
-  section 6); a three.js game exposes its numbers through `__bpTest.perf()`.
+  section 7); a three.js game exposes its numbers through `__bpTest.perf()`.
 
 ## Determinism on the main thread
 
@@ -147,7 +174,10 @@ already playing.
   platform; the `touchmove` guard is a game-side workaround.
 - Swipes that start on the feed's own chrome (the rim beside the game, the
   action row under it) still page the feed; no game can prevent that.
-- Landscape: no source states whether landscape phones must be playable;
-  portrait is the surface the feed and the app use.
+- Landscape (resolved): a game declares it with `defineDisplay`. `portrait`
+  (the default) is letterboxed or painted out on a wide screen; `any` adapts
+  its view; `landscape` is for a game that cannot play in portrait, and the
+  feed letterboxes it on a phone. Portrait stays the surface the feed and the
+  app use.
 - Whether a game may use `localStorage` for a remembered preference (one
   shipped game remembers a character pick) is practice, not a written rule.
