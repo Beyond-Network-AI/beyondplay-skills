@@ -7,6 +7,9 @@
 export default {
   // The engine steps at 1/120 s; the performance smoke replays the run at this rate.
   stepsPerSecond: 120,
+  // A game that declares keys (defineDisplay) can tune how smoke:keys presses them;
+  // without this section each verb's first key is held for 30 steps:
+  // keys: { verbs: { tap: { press: 'Space' } } },
   // A competent run: tap when the marker is at the centre of the zone.
   play(t) {
     for (let guard = 0; guard < 40; guard++) {
