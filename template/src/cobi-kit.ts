@@ -1,7 +1,7 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/cobi.ts by scripts/sync-cobi-kit.mjs.
-//   commit  cb2daee517a7f165abe773f8f00e5b1e75985b95
+//   commit  5d694345fcafc018b1e78d1c5a0ec29ed5cca4fd
 //   sha256  7aef6f5084241245c40a2dd106a3ec0bc715f579185f56f78780ebf78a3a9b70  (of the source file; template/src/cobi-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-cobi-kit -- <path to that checkout>
