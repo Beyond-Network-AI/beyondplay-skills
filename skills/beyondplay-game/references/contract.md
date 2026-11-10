@@ -17,6 +17,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/beyondplay-kit.ts` | platform | `defineChallenge`, `defineSoloGame`, `declareUses`, `getMatch`, `onMatchResult`, `buildManifest`. |
 | `src/beyondplay-platform.ts` | platform | `request`, `capabilities`, `can`, `onCapabilities`: the platform capabilities (section 9). Import it; do not edit it. |
 | `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it. |
+| `src/beyondplay-audio.ts` | platform | `loadSound`, `play`, `startMusic`, `setMuted`: sound effects and a music loop (section 5a). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
 | `tsconfig.json`, `vite.config.ts` | platform | Strict TypeScript; shared Vite settings. |
@@ -211,6 +212,39 @@ and never per frame. The shell owns routing, the user preference and the
 throttle (at least 50 ms spacing plus a per-second burst cap); a dropped
 haptic is correct behaviour. Never call `navigator.vibrate` or a Telegram
 haptics API directly.
+
+## 5a. Sound, music and the asset library
+
+A game should have sound: a small set of effects (tap, hit, pickup, win, lose) and one music loop.
+Take them from the platform's asset library before making your own:
+
+- On the creator MCP, `search_assets` finds ready, licensed parts (sound effects, music loops by
+  mood, sprites, tiles, UI pieces, the bull kit) and `add_asset` gives, for one result, the file's
+  address, where it goes in the game (`public/assets/library/<pack>/...`), how to use it and the
+  exact line for `CREDITS.md`. Search first; draw, generate or record only when nothing fits.
+- Small files (art, sound, music) are copied into the game. 3D kits are loaded from
+  `assets.beyondplay.xyz` at run time and never copied, so the game stays inside the weight limits.
+- Every file under `public/assets/library/` needs its line in `CREDITS.md`, tagged
+  `[library: <id>]` (`GAME_LIBRARY_CREDIT_MISSING`, listing tier). Assets that are not from the
+  library keep the existing rule: owned, CC0 or commercially licensed, and named in `CREDITS.md`.
+
+Play audio through `src/beyondplay-audio.ts`, which keeps the rules for you:
+
+```ts
+import { loadSounds, play, startMusic, setMuted } from './beyondplay-audio';
+
+// after the first frame
+loadSounds({ coin: '/assets/library/sfx-core/coin/coin-01.ogg', hit: '/assets/library/sfx-core/hit/impact-01.ogg' });
+startMusic('/assets/library/music-core/loop/arcade-level-1.ogg', { volume: 0.4 });
+
+play('coin');            // on the event, in src/App.tsx, never in src/game.ts
+setMuted(true);          // the game's mute control
+```
+
+Nothing sounds before the player's first touch (music waits for it); audio loads after the first
+frame and never blocks play; the game goes quiet when its card scrolls away; the checks run silent
+under `?bp_test=1`. Budgets: a sound set under 1 MB, a music loop under 1.5 MB. Sound is look and
+feel only: the simulation never reads it.
 
 ## 6. The test hook
 

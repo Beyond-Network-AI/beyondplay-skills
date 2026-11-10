@@ -80,6 +80,18 @@ describe('beyondplay-check game', () => {
     rmSync(warn, { recursive: true, force: true });
   });
 
+  it('a library asset needs its line in CREDITS.md, and the asset host is not an external request', async () => {
+    write(join(dir, 'public/assets/library/sfx-core/coin/coin-01.ogg'), Buffer.alloc(64, 1));
+    append(join(dir, 'src/App.tsx'), "const kitBase = 'https://assets.beyondplay.xyz/library/v0/music-core/loop/arcade-level-1.ogg';");
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_LIBRARY_CREDIT_MISSING')).toMatchObject({ severity: 'warning', tier: 'listing', path: 'public/assets/library/sfx-core/coin/coin-01.ogg' });
+    expect(codes(r)).not.toContain('GAME_EXTERNAL_REQUEST');
+    write(join(dir, 'CREDITS.md'), '# Credits\n\n## Library assets\n\n- Coins by Someone (CC0-1.0) [library: sfx-core/coin/coin-01]\n');
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_LIBRARY_CREDIT_MISSING');
+    expect(codes(r)).not.toContain('GAME_AUDIO_LICENCE_MISSING');
+  });
+
   it('reports links out, identity prompts and share buttons, each with its tier', async () => {
     append(join(dir, 'src/App.tsx'), "const a = <a href=\"https://opensea.io/item/ethereum/0x1\" target=\"_blank\">Open on OpenSea</a>;");
     append(join(dir, 'src/App.tsx'), "const name = window.prompt('Enter your name');");
