@@ -16,7 +16,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/main.tsx` | platform | `window.BeyondPlay` shell, parent auth listener, WebKit image hardening, React mount of `./App`. |
 | `src/beyondplay-kit.ts` | platform | `defineChallenge`, `defineSoloGame`, `declareUses`, `getMatch`, `onMatchResult`, `buildManifest`. |
 | `src/beyondplay-platform.ts` | platform | `request`, `capabilities`, `can`, `onCapabilities`: the platform capabilities (section 9). Import it; do not edit it. |
-| `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it. |
+| `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it (an edited copy is scanned as the game's own code). |
 | `src/beyondplay-audio.ts` | platform | `loadSound`, `play`, `startMusic`, `setMuted`: sound effects and a music loop (section 5a). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |

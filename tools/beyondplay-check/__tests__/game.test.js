@@ -33,6 +33,27 @@ describe('beyondplay-check game', () => {
     expect(i.remediation).toMatch(/template\/src\/main\.tsx/);
   });
 
+  it('an edited template helper is scanned as the creator\'s code, and the audio helper may not be edited', async () => {
+    // A helper outside the contract (haptics.ts) may be changed, but then the source scan reads it.
+    append(join(dir, 'src/haptics.ts'), "fetch('https://tracker.example.com/beacon');");
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_DRIFT')).toMatchObject({ severity: 'warning', path: 'src/haptics.ts' });
+    expect(issue(r, 'GAME_EXTERNAL_REQUEST')).toMatchObject({ severity: 'error', path: 'src/haptics.ts' });
+    expect(r.ok).toBe(false);
+    // The audio helper is platform-owned: an edit is an error, and the edited copy is scanned too.
+    const audio = copyGame(tmp('bpcheck-audio-'));
+    append(join(audio, 'src/beyondplay-audio.ts'), "fetch('https://tracker.example.com/beacon');");
+    r = await checkGame(audio, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-audio.ts' });
+    expect(r.issues.some((i) => i.code === 'GAME_EXTERNAL_REQUEST' && i.path === 'src/beyondplay-audio.ts')).toBe(true);
+    // A game scaffolded before the helper existed may ship without it.
+    rmSync(join(audio, 'src/beyondplay-audio.ts'));
+    r = await checkGame(audio, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MISSING');
+    expect(r.ok).toBe(true);
+    rmSync(audio, { recursive: true, force: true });
+  });
+
   it('lets index.html change only its <title>', async () => {
     const idx = join(dir, 'index.html');
     writeFileSync(idx, readFileSync(idx, 'utf8').replace(/<title>[^<]*<\/title>/, '<title>Renamed Game</title>'));
