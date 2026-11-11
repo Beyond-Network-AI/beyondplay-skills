@@ -188,6 +188,24 @@ export function checkAudioLicence(gameDir, files, report) {
   report.warning('GAME_AUDIO_LICENCE_MISSING', audio[0].rel, `${audio.length} audio file${audio.length === 1 ? '' : 's'} shipped but no CREDITS.md (or LICENCE note) found in the game folder.`, 'Add a CREDITS.md naming each track: title, author, source and licence. The licence must allow commercial games (CC0 is the default; the creator attests to the list on submission).', { docs: DOCS.playbookAudio });
 }
 
+/**
+ * Library assets. A file under public/assets/library/ came from the asset library
+ * (add_asset), which also gives its CREDITS.md line, tagged "[library: <id>]" where
+ * the id is the file's path under that folder without its extension. A file with no
+ * such line is a listing finding: the credit is how the licence travels with the game.
+ */
+export function checkLibraryCredits(gameDir, files, report) {
+  const PREFIX = 'public/assets/library/';
+  const lib = files.filter((f) => f.rel.startsWith(PREFIX));
+  if (!lib.length) return;
+  const credits = files.find((f) => /^credits\.md$/i.test(f.rel));
+  const text = credits ? readFileSync(credits.abs, 'utf8') : '';
+  const missing = lib.filter((f) => !text.includes(`[library: ${f.rel.slice(PREFIX.length).replace(/\.[a-z0-9]+$/i, '')}]`));
+  if (!missing.length) return;
+  const names = missing.slice(0, 3).map((f) => f.rel).join(', ');
+  report.warning('GAME_LIBRARY_CREDIT_MISSING', missing[0].rel, `${missing.length} library asset${missing.length === 1 ? ' has' : 's have'} no line in CREDITS.md: ${names}${missing.length > 3 ? ', ...' : ''}.`, 'Add the credits line add_asset gave for each (under "## Library assets" in CREDITS.md), or remove the file.', { docs: DOCS.playbookAudio });
+}
+
 /** A `uses` entry split into the capability and, for player.items, its collection ('player.items:cobi'). */
 export function parseUse(entry) {
   const i = entry.indexOf(':');

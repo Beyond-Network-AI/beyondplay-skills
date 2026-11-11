@@ -299,6 +299,7 @@ Breaking any of these ships a broken game or a rejected one.
 - [ ] Portrait screenshots inspected; text readable at phone size; canvas fills the viewport
 - [ ] No external requests in the network log beyond the platform and the template's font
 - [ ] No brand names or third-party IP; fan disclaimer present where required; no emoji
+- [ ] The asset library was searched first (`search_assets`, `add_asset` on the creator MCP); the game has a sound set and a music loop, played through `src/beyondplay-audio.ts`
 - [ ] Every asset and track is owned, CC0 or commercially licensed, and named in `CREDITS.md`; audio unlocks on a gesture
 - [ ] `assets/icon.png` rendered (and `assets/banner.jpg` if you want one)
 - [ ] `publish.config.json` complete; `visibility` is `unlisted`

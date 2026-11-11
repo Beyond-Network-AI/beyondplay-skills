@@ -6,16 +6,22 @@
 // an edited copy is). The other files the template ships (vite.config.ts,
 // tsconfig.json, src/haptics.ts, src/index.css, src/webkit-image-hardening.ts,
 // src/cobi-kit.SOURCE.json) are not protected by the contract, so a
-// difference there is a warning (drift), not an error.
+// difference there is a warning (drift), not an error. src/beyondplay-audio.ts
+// is a contract file a game may ship without, like the loader.
+//
+// Only a copy that matches the template is "owned" and skipped by the source
+// scan. A copy that differs is the creator's code, whatever its name: it is
+// scanned like any other source file, so an edited helper cannot carry a
+// network call, a wallet prompt or an identity prompt past the checks.
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256, walk } from './files.js';
 import { DOCS } from './limits.js';
 
-export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts'];
+export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts', 'src/beyondplay-audio.ts'];
 /** Contract files a game may ship without: added after the first games were scaffolded, so absence is drift, not an error. */
-export const OPTIONAL_CONTRACT_FILES = new Set(['src/cobi-kit.ts']);
+export const OPTIONAL_CONTRACT_FILES = new Set(['src/cobi-kit.ts', 'src/beyondplay-audio.ts']);
 /** Starter files the template ships for the game to replace; never compared. */
 export const STARTER_FILES = new Set(['src/App.tsx', 'src/game.ts', 'src/beyondplay.config.ts', 'smoke.driver.mjs']);
 
@@ -88,6 +94,8 @@ export function checkTemplate(gameDir, templateDir, report) {
     } else {
       report.warning('GAME_TEMPLATE_FILE_DRIFT', t.rel, `${t.rel} differs from template/${t.rel} (${where}).`, 'Fine if the game changed it on purpose (colours, build options); otherwise re-copy it from the template.', { line: diff.line, docs: DOCS.contract });
     }
+    // The game's copy is not the template's: scan it as the creator's own code.
+    owned.delete(t.rel);
   }
   return owned;
 }
