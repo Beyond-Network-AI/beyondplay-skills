@@ -143,6 +143,8 @@ const measured = {
   frame: frameStats(played.deltas),
   drawCalls: played.drawCalls,
   triangles: played.triangles,
+  softwareGl: played.softwareGl === true,
+  glRenderer: played.glRenderer ?? null,
   heapBytes,
   heapAfterS: heapSeconds,
   cpuThrottle: PERF_SETUP.cpuThrottle,
