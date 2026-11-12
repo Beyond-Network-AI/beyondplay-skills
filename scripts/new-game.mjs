@@ -30,7 +30,7 @@ if (existsSync(dest)) {
 cpSync(join(KIT_ROOT, 'template'), dest, { recursive: true, filter: (src) => src !== join(KIT_ROOT, 'template', 'dist') });
 // A genre starter replaces the starter files and adds its own (scene, sounds, music).
 const CREDIT_LINES = 'CREDITS.library.md';
-if (starter) cpSync(join(STARTERS, starter), dest, { recursive: true, filter: (src) => !src.endsWith(CREDIT_LINES) });
+if (starter) cpSync(join(STARTERS, starter), dest, { recursive: true, filter: (src) => !src.endsWith(CREDIT_LINES) && !src.endsWith('starter.json') });
 const libraryCredits = starter && existsSync(join(STARTERS, starter, CREDIT_LINES)) ? readFileSync(join(STARTERS, starter, CREDIT_LINES), 'utf8').trim() : '';
 
 const idx = join(dest, 'index.html');

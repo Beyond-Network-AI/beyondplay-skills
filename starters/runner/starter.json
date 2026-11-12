@@ -1,0 +1,6 @@
+{
+  "title": "Runner",
+  "description": "A 3D endless runner: three lanes, obstacles to dodge, jump or slide under, coins to pick up, sixty seconds or three hits. The shared bull with blended run, jump, slide, hit and knockout animation, a sound set and a music loop from the asset library, and the HUD kit. Replace the obstacles, the speed curve, the scoring and the scene; keep the shape of src/game.ts (the engine) and src/App.tsx (the shell).",
+  "dependencies": ["three"],
+  "devDependencies": ["@types/three"]
+}
