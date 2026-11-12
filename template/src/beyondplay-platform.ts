@@ -170,8 +170,10 @@ export interface StoreItem {
   /** True when this player owns it, on every device. Always false signed out. */
   owned: boolean;
 }
-/** List the game's items, or ask the platform to sell one (it opens its own sheet). */
-export type StoreParams = { op: 'items' } | { op: 'buy'; item: string };
+/** List the game's items, or ask the platform to sell one (it opens its own sheet). With `wait`,
+ *  the host answers { outcome: 'pending' } while its sheet is still open and the caller asks
+ *  again; src/beyondplay-store.ts does this, so buy through it. */
+export type StoreParams = { op: 'items' } | { op: 'buy'; item: string; wait?: boolean };
 /** The answer to a buy that ended with the player owning the item. */
 export interface StoreBuyResult {
   outcome: 'bought' | 'owned';
@@ -200,8 +202,8 @@ export interface CapabilityResults {
   'player.friends': PlayerFriend[] | null;
   /** A PlayerSave for a read, a PlayerSaveWrite for a write, null when signed out. */
   'player.save': PlayerSave | PlayerSaveWrite | null;
-  /** StoreItem[] for items; a StoreBuyResult for a buy (it rejects with cancelled when the player closes the sheet). */
-  store: StoreItem[] | StoreBuyResult;
+  /** StoreItem[] for items; a StoreBuyResult for a buy (it rejects with cancelled when the player closes the sheet), or { outcome: 'pending' } to a buy with `wait` while the sheet is open. */
+  store: StoreItem[] | StoreBuyResult | { outcome: 'pending' };
 }
 
 /** Why a request was not answered with a result. */

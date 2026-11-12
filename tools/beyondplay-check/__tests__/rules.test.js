@@ -50,7 +50,10 @@ describe('the rules table', () => {
 describe('the store', () => {
   it('is one open capability with two operations, and says who confirms a purchase', () => {
     const store = capabilityFor('store');
-    expect(store).toMatchObject({ tier: 'open', since: '2026-11-12', phase: 4, params: '{ op: "items" } or { op: "buy", item }' });
+    expect(store).toMatchObject({ tier: 'open', since: '2026-11-12', phase: 4, params: '{ op: "items" } or { op: "buy", item, wait? }' });
+    // A player takes longer in the sheet than one request may: the helper keeps asking while it is open.
+    expect(store.returns).toContain('"pending"');
+    expect(store.returns).toContain('always buy through it');
     expect(store.note).toContain('defineStore');
     expect(store.note).toContain('never sees a balance');
     expect(store.note).toContain('cannot confirm a purchase');
