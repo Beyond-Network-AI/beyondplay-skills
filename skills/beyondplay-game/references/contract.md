@@ -20,6 +20,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/beyondplay-audio.ts` | platform | `loadSound`, `play`, `startMusic`, `setMuted`: sound effects and a music loop (section 5a). Import it; do not edit it. |
 | `src/beyondplay-hud.tsx` | platform | `Hud`, `HudRow`, `Stat`, `Timer`, `Hearts`, `Meter`, `Callout`, `HudButton`, `Stick`, `EndCard`, `setHudTheme`: what shows over the play (section 5b). Import it; do not edit it. |
 | `src/beyondplay-anim.ts` | platform | `loadClips`, `Animator`: clip packs for the shared bull kit and cross-faded animation states (section 5c). Import it; do not edit it. |
+| `src/beyondplay-save.ts` | platform | `loadSave`, `writeSave`, `flushSave`: progress that follows the player (section 5e). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
 | `tsconfig.json`, `vite.config.ts` | platform | Strict TypeScript; shared Vite settings. |
@@ -361,6 +362,36 @@ from the starter that is nearest your idea and change it; keep its shape.
 - `runner`: three lanes, obstacles to dodge, jump or slide under, coins, sixty seconds or three
   hits. three.js, 15 draw calls, about 28,000 triangles with the bull.
 
+## 5e. Saved progress
+
+A game's progress follows the player: unlocks, settings, a collection, how far they got. Save it
+through `src/beyondplay-save.ts` and declare `player.save`:
+
+```ts
+import { loadSave, writeSave, flushSave } from './beyondplay-save';
+
+const save = await loadSave({ gems: 0, unlocked: [] as string[] });   // after the first frame
+save.gems += 5;
+writeSave(save);        // whenever it changes: the device at once, the platform shortly after
+flushSave();            // at the end of a run
+```
+
+```ts
+export const game = defineSoloGame({ challenge, uses: ['share', 'player.save'] });
+```
+
+- For a signed-in player the platform keeps the save, so it is there on their next phone, in the
+  app and on the web. A copy is always kept on the device, which is all a signed-out player has;
+  on load the newer of the two wins.
+- One JSON value of at most 16 KB. A field added later gets its default from the fallback you pass.
+- Never hold play for it: load after the first frame, and treat no answer as "nothing saved".
+- A save holds no personal data, and nobody but its player ever reads it.
+- **In a duel a run plays the same for both players whatever either has saved**
+  (`GAME_SAVE_CHANGES_A_DUEL`, review tier). What a save unlocks is looks, sounds and solo play;
+  when `getMatch()` answers a match, start both players from the same loadout.
+- Importing the helper without declaring `player.save` is `GAME_CAPABILITY_UNDECLARED`: the
+  platform would answer denied and the save would stay on the device.
+
 ## 6. The test hook
 
 Required when `?bp_test=1` is present:
@@ -505,6 +536,7 @@ does not list.
 | `player.items` | open | `{ collection }` | `PlayerItem[]`, the player's items in the one collection the game declared; `null` when signed out, no wallet is linked, the player opted out or the game is not allowed to ask; `[]` when the wallet holds nothing in it. Declared as `player.items:<collection>` in `uses`. See Player items below. |
 | `player.stats` | open | | `{ best, plays, lastPlayedAt }` for this game, or `null` when signed out; what the leaderboard already shows. |
 | `player.friends` | open | | `[{ displayName, avatar, best }]` for friends who played this game, or `null` when signed out. No ids, no items, no lookup by player. |
+| `player.save` | open | `{ op: 'get' }` or `{ op: 'set', data }` | `{ data, updatedAt }` for a read, `{ ok, updatedAt }` for a write, or `null` when signed out. One JSON value per player per game, at most 16 KB, private to that player. Use `src/beyondplay-save.ts` (section 5e). |
 
 Tiers: `open` is answered without asking the player, which covers
 everything offered (phase one and, since 6 November 2026, phase two:

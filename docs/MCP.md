@@ -69,6 +69,7 @@ and its default item (`capabilities[].default`).
 | `player.items` | `{ collection }` | `PlayerItem[]` in the one declared collection (`uses: ['player.items:cobi']`), `null` when signed out, no wallet, opted out or not allowed, `[]` when the wallet holds nothing. Look and sound only. |
 | `player.stats` | | `{ best, plays, lastPlayedAt }` for this game, or `null`. |
 | `player.friends` | | `[{ displayName, avatar, best }]` for friends who played this game, or `null`. |
+| `player.save` | `{ op: 'get' }` or `{ op: 'set', data }` | The player's saved progress in this game: `{ data, updatedAt }`, `{ ok, updatedAt }` for a write, or `null` signed out. At most 16 KB. |
 
 Limits: 50 MB and 1,500 files per archive, 10 MB per file; one build at a time, 100 a
 day, 10 in five minutes; 60 requests a minute.

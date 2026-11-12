@@ -239,6 +239,8 @@ export function parseUse(entry) {
  * on the platform; get_contract serves it, and the host answers denied for one
  * the manifest does not declare), so only the slug's shape is checked here.
  */
+const SAVE_HELPER_IMPORT = /from\s+['"]\.{1,2}\/(?:[\w-]+\/)*beyondplay-save['"]/;
+
 export function checkCapabilities(files, templateOwned, manifest, report) {
   const found = new Map();
   for (const f of textFiles(files, templateOwned)) {
@@ -249,6 +251,8 @@ export function checkCapabilities(files, templateOwned, manifest, report) {
       for (const m of line.matchAll(CAPABILITY_CALL)) {
         if (!found.has(m[1])) found.set(m[1], { rel: f.rel, line: i + 1 });
       }
+      // The save helper asks for player.save on the game's behalf: importing it is using the capability.
+      if (SAVE_HELPER_IMPORT.test(line) && !found.has('player.save')) found.set('player.save', { rel: f.rel, line: i + 1 });
     });
   }
   const names = [...found.keys()].sort();

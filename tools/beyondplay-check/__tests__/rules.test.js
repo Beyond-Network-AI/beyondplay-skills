@@ -12,7 +12,7 @@ describe('the rules table', () => {
 
   it('lists the capabilities with a tier and a phase; only the ones with a since date are offered', () => {
     expect(CAPABILITY_NAMES).toEqual(expect.arrayContaining(['capabilities', 'host', 'player.profile', 'share']));
-    expect(OFFERED_CAPABILITIES).toEqual(['capabilities', 'host', 'player.profile', 'share', 'player.items', 'player.stats', 'player.friends']);
+    expect(OFFERED_CAPABILITIES).toEqual(['capabilities', 'host', 'player.profile', 'share', 'player.items', 'player.stats', 'player.friends', 'player.save']);
     for (const c of CAPABILITIES) {
       expect(['open', 'consent', 'platform']).toContain(c.tier);
       expect(typeof c.returns).toBe('string');
