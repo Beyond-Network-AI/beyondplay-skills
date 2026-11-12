@@ -351,7 +351,7 @@ the driver's `stepsPerSecond`, default 60).
 | Measure | Budget | Code (tier) |
 |---|---|---|
 | Time to first frame: `bp_ready` at the parent or the first drawn canvas, from navigation | 5 s | `GAME_SLOW_FIRST_FRAME` (listing) |
-| 95th percentile frame time over ten seconds of driven play | 33 ms (a 30 fps floor; 60 fps is the target) | `GAME_FRAME_TIME` (listing) |
+| 95th percentile frame time over ten seconds of driven play | 33 ms (a 30 fps floor; 60 fps is the target) | `GAME_FRAME_TIME` (listing). A game that draws with WebGL is not judged on this where the check machine has no graphics card (`GAME_FRAME_TIME_NOT_JUDGED`, an info line): its budget is draw calls and triangles. |
 | Draw calls per frame, the most seen, from `__bpTest.perf()` | 60 | `GAME_DRAW_CALLS` (listing) |
 | Triangles per frame, the most seen, from `__bpTest.perf()` | 300,000 | `GAME_TRIANGLES` (listing) |
 | JavaScript heap after a minute of play | informational | `GAME_HEAP` (review, info) |
