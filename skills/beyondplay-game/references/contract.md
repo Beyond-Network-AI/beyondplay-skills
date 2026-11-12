@@ -431,6 +431,11 @@ if (owns('trail-neon')) renderer.setTrail('neon');   // in src/App.tsx, never in
   reviewer has approved it and the game; until then show it without a price, or not at all.
 - `buy(id)` opens the platform's sheet and resolves once the player owns the item. A rejection is
   normal (the player closed the sheet, is signed out, or this host does not sell): catch it.
+  Always buy through `buy(id)`, never a bare `request('store', ...)`: a player takes their time in
+  the sheet, and the helper keeps asking the host while it is open (a bare request gives up after
+  ten seconds and never hears that the player bought).
+- The host may show its own game-over card over the game's end card. Offer items where the player
+  will see them: on the end card and, if the game has room for one, behind a small control.
 - A picture is a png, webp or jpg under `public/`, showing the item as it looks in the game.
 - A changed name, picture or price is reviewed again, and the item is off sale until it is; an
   item the build no longer declares stops selling, and the players who own it keep it.
@@ -595,7 +600,7 @@ does not list.
 | `player.stats` | open | | `{ best, plays, lastPlayedAt }` for this game, or `null` when signed out; what the leaderboard already shows. |
 | `player.friends` | open | | `[{ displayName, avatar, best }]` for friends who played this game, or `null` when signed out. No ids, no items, no lookup by player. |
 | `player.save` | open | `{ op: 'get' }` or `{ op: 'set', data }` | `{ data, updatedAt }` for a read, `{ ok, updatedAt }` for a write, or `null` when signed out. One JSON value per player per game, at most 16 KB, private to that player. Use `src/beyondplay-save.ts` (section 5e). |
-| `store` | open | `{ op: 'items' }` or `{ op: 'buy', item }` | For `items`: `[{ id, name, blurb, image, price, onSale, owned }]`, the items declared with `defineStore`. For `buy`: `{ outcome: 'bought' \| 'owned' }` once the player owns the item; rejects with `cancelled` when the player closes the platform's sheet. Use `src/beyondplay-store.ts` (section 5f). |
+| `store` | open | `{ op: 'items' }` or `{ op: 'buy', item, wait? }` | For `items`: `[{ id, name, blurb, image, price, onSale, owned }]`, the items declared with `defineStore`. For `buy`: `{ outcome: 'bought' \| 'owned' }` once the player owns the item; rejects with `cancelled` when the player closes the platform's sheet. Use `src/beyondplay-store.ts` (section 5f). |
 
 Tiers: `open` is answered without asking the player, which covers
 everything offered (phase one and, since 6 November 2026, phase two:

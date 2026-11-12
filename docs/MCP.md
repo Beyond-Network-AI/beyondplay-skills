@@ -70,7 +70,7 @@ and its default item (`capabilities[].default`).
 | `player.stats` | | `{ best, plays, lastPlayedAt }` for this game, or `null`. |
 | `player.friends` | | `[{ displayName, avatar, best }]` for friends who played this game, or `null`. |
 | `player.save` | `{ op: 'get' }` or `{ op: 'set', data }` | The player's saved progress in this game: `{ data, updatedAt }`, `{ ok, updatedAt }` for a write, or `null` signed out. At most 16 KB. |
-| `store` | `{ op: 'items' }` or `{ op: 'buy', item }` | The game's own cosmetic items for B-Bucks: what is on sale and owned, and the platform's purchase sheet. Declared with `defineStore`; the platform takes the B-Bucks and keeps who owns what. |
+| `store` | `{ op: 'items' }` or `{ op: 'buy', item, wait? }` | The game's own cosmetic items for B-Bucks: what is on sale and owned, and the platform's purchase sheet. Declared with `defineStore`; the platform takes the B-Bucks and keeps who owns what. |
 
 Limits: 50 MB and 1,500 files per archive, 10 MB per file; one build at a time, 100 a
 day, 10 in five minutes; 60 requests a minute.

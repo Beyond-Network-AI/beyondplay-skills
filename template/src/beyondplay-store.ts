@@ -29,6 +29,10 @@
 import { can, onCapabilities, request, type StoreBuyResult, type StoreItem } from './beyondplay-platform';
 
 const HELLO_WAIT_MS = 1500;
+/** How long buy() keeps asking while the platform's sheet is open; a player who leaves it open longer gets "unavailable". */
+const BUY_WAIT_MS = 10 * 60 * 1000;
+/** The least time between two refreshes of the catalogue that the game did not ask for. */
+const REFRESH_EVERY_MS = 5000;
 
 /** One item the game offers in the platform's store. Look and sound only. */
 export interface StoreItemDecl {
@@ -82,6 +86,7 @@ function hostReady(): Promise<void> {
  *  Call it after the first frame. Never rejects: [] where no host answers (a test run, a host
  *  without a store), so the game simply shows nothing for sale. */
 export async function storeItems(): Promise<StoreItem[]> {
+  asked = true;
   await hostReady();
   if (!can('store')) return publish([]);
   try {
@@ -106,11 +111,44 @@ export function storeItem(id: string): StoreItem | null {
 /** Ask the platform to sell the item. The platform opens its own sheet; the promise resolves once
  *  the player owns the item (bought now, or owned already) and rejects with a CapabilityError
  *  otherwise: 'cancelled' when the player closed the sheet, 'denied' or 'unavailable' where the
- *  item cannot be sold. Call it from a press on the item, never by itself. */
+ *  item cannot be sold. Call it from a press on the item, never by itself.
+ *
+ *  A player may take their time in the sheet, longer than a host waits to answer one request. So
+ *  the host answers "pending" while the sheet is open and this asks again, until the player has
+ *  bought or closed it. Always buy through this function: a bare request('store') would give up
+ *  after ten seconds and never hear that the player bought. */
 export async function buy(id: string): Promise<StoreBuyResult> {
-  const result = (await request('store', { op: 'buy', item: id })) as StoreBuyResult;
-  publish(catalogue.map((item) => (item.id === id ? { ...item, owned: true } : item)));
-  return result;
+  const started = Date.now();
+  for (;;) {
+    const answer = (await request('store', { op: 'buy', item: id, wait: true })) as StoreBuyResult | { outcome: 'pending' };
+    if (answer && answer.outcome === 'pending') {
+      if (Date.now() - started > BUY_WAIT_MS) {
+        const err = new Error('the purchase sheet was left open') as Error & { code: string; reason: string };
+        err.code = 'unavailable';
+        err.reason = 'timeout';
+        throw err;
+      }
+      continue; // the sheet is still open: ask again
+    }
+    publish(catalogue.map((item) => (item.id === id ? { ...item, owned: true } : item)));
+    return answer as StoreBuyResult;
+  }
+}
+
+// The catalogue is read again when the player comes back to the game (from the platform's sheet,
+// a top-up, another tab), so what they own is never stale for long. Quiet and never more often
+// than every few seconds; only once the game has asked for the catalogue itself.
+let asked = false;
+let refreshedAt = 0;
+function refreshOnReturn(): void {
+  if (!asked || Date.now() - refreshedAt < REFRESH_EVERY_MS) return;
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+  refreshedAt = Date.now();
+  void storeItems();
+}
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('focus', refreshOnReturn);
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', refreshOnReturn);
 }
 
 /** Called with the catalogue whenever it changes (after storeItems() and after a purchase).
