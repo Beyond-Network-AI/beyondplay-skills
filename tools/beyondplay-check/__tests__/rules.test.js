@@ -12,11 +12,11 @@ describe('the rules table', () => {
 
   it('lists the capabilities with a tier and a phase; only the ones with a since date are offered', () => {
     expect(CAPABILITY_NAMES).toEqual(expect.arrayContaining(['capabilities', 'host', 'player.profile', 'share']));
-    expect(OFFERED_CAPABILITIES).toEqual(['capabilities', 'host', 'player.profile', 'share', 'player.items', 'player.stats', 'player.friends', 'player.save']);
+    expect(OFFERED_CAPABILITIES).toEqual(['capabilities', 'host', 'player.profile', 'share', 'player.items', 'player.stats', 'player.friends', 'player.save', 'store']);
     for (const c of CAPABILITIES) {
       expect(['open', 'consent', 'platform']).toContain(c.tier);
       expect(typeof c.returns).toBe('string');
-      expect([1, 2, 3]).toContain(c.phase);
+      expect([1, 2, 3, 4]).toContain(c.phase);
     }
   });
 
@@ -44,6 +44,41 @@ describe('the rules table', () => {
     expect(ruleFor('GAME_ITEM_IN_SIMULATION').rule).toContain('src/game.ts');
     expect(ruleFor('GAME_WALLET_GATING').instead).toContain("request('player.items', { collection: 'cobi' })");
     expect(ruleFor('GAME_WALLET_GATING').instead).toContain("uses: ['player.items:cobi']");
+  });
+});
+
+describe('the store', () => {
+  it('is one open capability with two operations, and says who confirms a purchase', () => {
+    const store = capabilityFor('store');
+    expect(store).toMatchObject({ tier: 'open', since: '2026-11-12', phase: 4, params: '{ op: "items" } or { op: "buy", item }' });
+    expect(store.note).toContain('defineStore');
+    expect(store.note).toContain('never sees a balance');
+    expect(store.note).toContain('cannot confirm a purchase');
+  });
+
+  it('holds a game to the store rules: the scans at listing, the judgement calls with the reviewer', () => {
+    for (const code of ['GAME_STORE_ITEMS_INVALID', 'GAME_STORE_IN_SIMULATION', 'GAME_OWN_PAYMENT']) expect(tierOf(code)).toBe('listing');
+    for (const code of ['GAME_STORE_RANDOM', 'GAME_STORE_GATES_PLAY', 'GAME_STORE_ITEM_MISLEADING']) expect(tierOf(code)).toBe('review');
+    expect(ruleFor('GAME_OWN_PAYMENT').instead).toContain('buy(id)');
+  });
+
+  it('answers a concept: a cosmetic shop is fine through the platform, loot boxes and selling gems are not', () => {
+    for (const text of ['a skin shop', 'an in-game store for trails', 'skins for sale', 'sell skins', 'in-app purchases', 'IAP', 'monetization', 'spend B-Bucks', 'buy a skin', 'buying new outfits']) {
+      const r = checkConcept({ description: text });
+      expect(r.verdicts.find((v) => v.feature === 'store'), text).toMatchObject({ allowed: 'conditional', code: 'GAME_OWN_PAYMENT', tier: 'listing' });
+      expect(r.blocking, text).toEqual([]);
+    }
+    const shop = checkConcept({ description: 'a skin shop' }).verdicts.find((v) => v.feature === 'store');
+    expect(shop.instead).toContain('defineStore');
+    expect(shop.verdict).toContain('fully playable without buying');
+    for (const text of ['open a loot box', 'gacha pulls', 'a mystery crate', 'lucky spin']) {
+      expect(checkConcept({ description: text }).blocking, text).toContain('loot_box');
+    }
+    for (const text of ['buy gems with B-Bucks', 'sell coins', 'purchase more currency']) {
+      expect(checkConcept({ description: text }).blocking, text).toContain('crypto_rewards');
+    }
+    // Storing something is not a store.
+    expect(checkConcept({ description: 'store the best score and restore it later' }).verdicts.some((v) => v.feature === 'store')).toBe(false);
   });
 });
 

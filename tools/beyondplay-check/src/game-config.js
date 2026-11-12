@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import vm from 'node:vm';
-import { DOCS } from './limits.js';
+import { DOCS, GAME_STORE } from './limits.js';
 
 export const CONFIG_REL = 'src/beyondplay.config.ts';
 const KIT_REL = 'src/beyondplay-kit.ts';
@@ -109,4 +109,43 @@ export async function checkConfig(gameDir, report) {
     report.error('GAME_CONFIG_BOARD_MISMATCH', CONFIG_REL, `submit() scored boards ${JSON.stringify(boards)} but the manifest declares '${unit.boardId}'.`, 'Do not wrap or re-implement submit(); restore src/beyondplay-kit.ts from the template.', { docs: DOCS.smoke });
   }
   return manifest;
+}
+
+const STORE_ID = new RegExp(GAME_STORE.idPattern);
+const STORE_IMAGE = new RegExp(GAME_STORE.imagePattern, 'i');
+
+/**
+ * The items the config declares with defineStore, against the store's limits. The platform applies
+ * the same limits at publish and leaves out an item that breaks one, so each is an error here.
+ * Returns the ids of the items that pass.
+ */
+export function checkStore(gameDir, manifest, report) {
+  const store = manifest && manifest.store;
+  if (!store) return [];
+  const bad = (what, fix) => report.error('GAME_STORE_ITEMS_INVALID', CONFIG_REL, `defineStore: ${what}.`, fix, { docs: DOCS.store });
+  if (!Array.isArray(store.items)) { bad('items must be a list', 'defineStore({ items: [{ id, name, price }] }).'); return []; }
+  if (store.items.length > GAME_STORE.maxItems) bad(`${store.items.length} items; a game offers at most ${GAME_STORE.maxItems}`, 'Offer fewer items; the platform leaves out the ones past the limit.');
+  const good = [];
+  const seen = new Set();
+  for (const item of store.items) {
+    if (!item || typeof item !== 'object') { bad('an entry is not an item', 'Each item is { id, name, price } with an optional blurb and image.'); continue; }
+    const id = typeof item.id === 'string' ? item.id : '';
+    const at = id ? `'${id}'` : 'an item';
+    let ok = true;
+    const fail = (what, fix) => { ok = false; bad(what, fix); };
+    if (!STORE_ID.test(id)) fail(`${at} needs an id of lower-case letters, digits and dashes, 2 to 40 characters`, "Name it like 'trail-neon'.");
+    else if (seen.has(id)) fail(`the id ${at} is used twice`, 'Give each item its own id.');
+    seen.add(id);
+    if (typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > GAME_STORE.maxName) fail(`${at} needs a name of at most ${GAME_STORE.maxName} characters`, 'Name the item as the player will read it in the sheet.');
+    if (!Number.isInteger(item.price) || item.price < GAME_STORE.minPrice || item.price > GAME_STORE.maxPrice) fail(`${at} has the price ${JSON.stringify(item.price)}; a price is a whole number of B-Bucks from ${GAME_STORE.minPrice} to ${GAME_STORE.maxPrice}`, '100 B-Bucks is about one US dollar.');
+    if (item.blurb !== undefined && (typeof item.blurb !== 'string' || item.blurb.trim().length > GAME_STORE.maxBlurb)) fail(`${at} has a blurb longer than ${GAME_STORE.maxBlurb} characters`, 'One short line about the item.');
+    if (item.image !== undefined) {
+      const image = typeof item.image === 'string' ? item.image : '';
+      if (!STORE_IMAGE.test(image) || image.includes('..') || image.includes('//')) fail(`${at} has the picture ${JSON.stringify(item.image)}; a picture is a png, webp or jpg inside the game`, "Put the file under public/ and name its path: image: 'assets/items/trail-neon.png'.");
+      else if (!existsSync(join(gameDir, 'public', image.replace(/^\//, '')))) fail(`${at} names the picture ${image}, which is not in public/`, `Add public/${image.replace(/^\//, '')}, a picture of the item as it looks in the game.`);
+    }
+    if (ok) good.push(id);
+  }
+  report.fact('storeItems', good);
+  return good;
 }

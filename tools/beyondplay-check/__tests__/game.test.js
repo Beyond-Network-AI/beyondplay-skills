@@ -250,6 +250,77 @@ describe('beyondplay-check game', () => {
     expect(issue(r, 'GAME_SHARE_BUTTON')).toMatchObject({ severity: 'warning', tier: 'listing' });
   });
 
+  it('a declared store passes; the helper may not be edited; importing it without declaring items is caught', async () => {
+    const config = join(dir, 'src/beyondplay.config.ts');
+    const app = join(dir, 'src/App.tsx');
+    append(app, "import { buy, owns, storeItems } from './beyondplay-store';\nvoid storeItems().then(() => { if (!owns('trail-neon')) buy('trail-neon').catch(() => {}); });");
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.facts.uses).toEqual(['share', 'store']);
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED')).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/App.tsx' });
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED').remediation).toContain('defineStore');
+
+    write(join(dir, 'public/assets/items/trail-neon.png'), 'png');
+    writeFileSync(config, "import { defineStore } from './beyondplay-store';\n" + readFileSync(config, 'utf8') + "\ndefineStore({ items: [{ id: 'trail-neon', name: 'Neon trail', blurb: 'A glowing trail.', image: 'assets/items/trail-neon.png', price: 150 }, { id: 'hat-gold', name: 'Gold hat', price: 2000 }] });\n");
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNKNOWN');
+    expect(codes(r)).not.toContain('GAME_STORE_ITEMS_INVALID');
+    expect(r.facts.storeItems).toEqual(['trail-neon', 'hat-gold']);
+
+    append(join(dir, 'src/beyondplay-store.ts'), 'export const mine = 1;');
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-store.ts' });
+  });
+
+  it('names each item that breaks a store limit', async () => {
+    const config = join(dir, 'src/beyondplay.config.ts');
+    const items = [
+      "{ id: 'ok-item', name: 'Fine', price: 50 }",
+      "{ id: 'Bad Id', name: 'x', price: 100 }",
+      "{ id: 'ok-item', name: 'Twice', price: 100 }",
+      "{ id: 'no-name', name: '  ', price: 100 }",
+      "{ id: 'cheap', name: 'Cheap', price: 49 }",
+      "{ id: 'dear', name: 'Dear', price: 2001 }",
+      "{ id: 'half', name: 'Half', price: 99.5 }",
+      "{ id: 'far', name: 'Far', price: 100, image: 'https://elsewhere.example/a.png' }",
+      "{ id: 'gone', name: 'Gone', price: 100, image: 'assets/items/missing.png' }",
+      `{ id: 'long', name: '${'n'.repeat(41)}', price: 100 }`,
+    ];
+    writeFileSync(config, "import { defineStore } from './beyondplay-store';\n" + readFileSync(config, 'utf8') + `\ndefineStore({ items: [${items.join(', ')}] });\n`);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    const found = r.issues.filter((i) => i.code === 'GAME_STORE_ITEMS_INVALID');
+    expect(found.every((i) => i.severity === 'error' && i.tier === 'listing' && i.path === 'src/beyondplay.config.ts')).toBe(true);
+    const text = found.map((i) => i.message).join('\n');
+    for (const part of ["'Bad Id' needs an id", "the id 'ok-item' is used twice", "'no-name' needs a name", "'cheap' has the price 49", "'dear' has the price 2001", "'half' has the price 99.5", "'far' has the picture", "'gone' names the picture assets/items/missing.png, which is not in public/", "'long' needs a name"]) expect(text).toContain(part);
+    expect(found).toHaveLength(9);
+    expect(r.facts.storeItems).toEqual(['ok-item']);
+  });
+
+  it('counts more than 30 items', async () => {
+    const config = join(dir, 'src/beyondplay.config.ts');
+    const items = Array.from({ length: 31 }, (_, n) => `{ id: 'item-${n}', name: 'Item ${n}', price: 100 }`);
+    writeFileSync(config, "import { defineStore } from './beyondplay-store';\n" + readFileSync(config, 'utf8') + `\ndefineStore({ items: [${items.join(', ')}] });\n`);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_STORE_ITEMS_INVALID').message).toContain('31 items; a game offers at most 30');
+  });
+
+  it('keeps the store out of the simulation, and payments and paid draws out of the game', async () => {
+    append(join(dir, 'src/game.ts'), "import { owns } from './beyondplay-store';\nexport const fast = owns('boots') ? 2 : 1;");
+    append(join(dir, 'src/App.tsx'), "const price = 'Only $0.99';\nconst box = 'Open a loot box';");
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_STORE_IN_SIMULATION')).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/game.ts' });
+    expect(issue(r, 'GAME_OWN_PAYMENT')).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/App.tsx' });
+    expect(issue(r, 'GAME_STORE_RANDOM')).toMatchObject({ severity: 'warning', tier: 'review', path: 'src/App.tsx' });
+  });
+
+  it('does not take ordinary code for a payment or a paid draw', async () => {
+    append(join(dir, 'src/App.tsx'), "const label = `${score}.00`;\nconst swap = 'a-b'.replace(/(a)-(b)/, '$2-$1');\nconst chest = 'A mystery chest appears';\n// Stripe is never used here\nconst stripes = 12;");
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_OWN_PAYMENT');
+    // A chest that play gives away is the game's own business where nothing is sold.
+    expect(codes(r)).not.toContain('GAME_STORE_RANDOM');
+  });
+
   it('importing the save helper is using player.save: it must be declared, and the helper may not be edited', async () => {
     append(join(dir, 'src/App.tsx'), "import { loadSave, writeSave } from './beyondplay-save';\nvoid loadSave({ gems: 0 }).then((s) => writeSave(s));");
     let r = await checkGame(dir, { template: TEMPLATE });

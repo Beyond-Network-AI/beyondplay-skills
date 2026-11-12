@@ -236,9 +236,14 @@ Breaking any of these ships a broken game or a rejected one.
   which opens the platform's sheet. Declare every capability the game requests
   in `uses` on `defineSoloGame`, and show such a control only when
   `can(name)` is true (`references/contract.md` section 9).
-- Rewards, currencies and unlocks inside a game are cosmetic and local; no
-  purchase, earnings or token language. Seasons, prizes and tokens are the
-  platform's: ask for them, never build them in.
+- Rewards, currencies and unlocks inside a game are cosmetic and local; a
+  game's own currency (gems, coins) is earned by playing and never sold, and
+  there is no earnings or token language. Seasons, prizes and tokens are the
+  platform's.
+- Selling is the platform's too: a game may offer cosmetic items for B-Bucks
+  through the platform's store (`defineStore`, `src/beyondplay-store.ts`,
+  contract section 5f). Looks and sounds only, no prices in money, no payment
+  screens, no loot boxes, and the game stays fully playable without buying.
 - No wallet, token or NFT gating. Holding an asset unlocks nothing; wallet
   operations belong to the host shell. Character traits are cosmetic only.
 - The player's own items come through the platform, never a wallet: declare
