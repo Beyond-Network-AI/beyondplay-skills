@@ -22,9 +22,13 @@ export const GAME_INITIAL_DOWNLOAD = { maxBytes: 20 * MB, docs: `${DESIGN} (init
 /** The platform's target for the same set, gzipped: well under about 1 MB (confirmed 2026-10-24). */
 export const GAME_BUNDLE_GZIP_TARGET = { maxBytes: 1 * MB, docs: 'beyondplay-skills skills/beyondplay-game/references/mobile-rules.md > Performance' };
 
+/** The platform store: what a game may offer for B-Bucks. The platform enforces the same numbers at publish and leaves out an item that breaks one. */
+export const GAME_STORE = { maxItems: 30, minPrice: 50, maxPrice: 2000, idPattern: '^[a-z0-9][a-z0-9-]{1,39}$', maxName: 40, maxBlurb: 120, imagePattern: '^/?\\w[\\w./-]*\\.(png|webp|jpg|jpeg)$', docs: `${DESIGN} (store)` };
+
 export const DOCS = {
   contract: 'beyondplay-skills skills/beyondplay-game/references/contract.md',
   capabilities: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 9. Capabilities',
+  store: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 5f. The store',
   playerItems: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 9. Capabilities > Player items; docs/player-items.md',
   testHook: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 6. The test hook',
   mobile: 'beyondplay-skills skills/beyondplay-game/references/mobile-rules.md',

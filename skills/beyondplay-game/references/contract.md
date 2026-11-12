@@ -173,7 +173,9 @@ Conformance also fails when `instanceKind` is `random` and `needsSeed` is
 `false`, and when the file on disk differs from what the config declares.
 
 A config that declares `uses` adds `"uses": ["share"]` to either shape; a
-config that declares nothing omits the field.
+config that declares nothing omits the field. A config that calls `defineStore`
+adds `"store": { "items": [{ "id", "name", "blurb", "image", "price" }] }` and
+`"store"` to `uses` (section 5f).
 
 ## 4. The runtime SDK: `window.BeyondPlay`
 
@@ -392,6 +394,62 @@ export const game = defineSoloGame({ challenge, uses: ['share', 'player.save'] }
 - Importing the helper without declaring `player.save` is `GAME_CAPABILITY_UNDECLARED`: the
   platform would answer denied and the save would stay on the device.
 
+## 5f. The store
+
+A game may offer cosmetic items for B-Bucks, the platform's currency (100 B-Bucks is about one US
+dollar). The platform sells them: it shows its own sheet with the item, the price and the
+player's balance, takes the B-Bucks when the player confirms, remembers who owns what on every
+device, and pays the creator 80% of the B-Bucks spent on their items. The game declares the items,
+shows what they look like and draws them for a player who owns them.
+
+Declare the items in the config (at most 30, each from 50 to 2,000 B-Bucks). Declaring a store
+declares the `store` capability for you:
+
+```ts
+import { defineStore } from './beyondplay-store';
+
+defineStore({ items: [
+  { id: 'trail-neon', name: 'Neon trail', blurb: 'A glowing trail behind your runner.', image: 'assets/items/trail-neon.png', price: 150 },
+  { id: 'skin-gold', name: 'Gold skin', image: 'assets/items/skin-gold.png', price: 400 },
+] });
+```
+
+Use them through `src/beyondplay-store.ts`:
+
+```ts
+import { storeItems, owns, buy } from './beyondplay-store';
+import { Price } from './beyondplay-hud';
+
+const items = await storeItems();                    // after the first frame; [] where no host answers
+if (owns('trail-neon')) renderer.setTrail('neon');   // in src/App.tsx, never in src/game.ts
+
+// on a locked item, on the end card or behind a small control (never before the first run)
+<Price amount={150} label="Neon trail" onPress={() => buy('trail-neon').then(() => renderer.setTrail('neon')).catch(() => {})} />
+```
+
+- `storeItems()` answers each declared item with `onSale` and `owned`. An item is on sale once a
+  reviewer has approved it and the game; until then show it without a price, or not at all.
+- `buy(id)` opens the platform's sheet and resolves once the player owns the item. A rejection is
+  normal (the player closed the sheet, is signed out, or this host does not sell): catch it.
+- A picture is a png, webp or jpg under `public/`, showing the item as it looks in the game.
+- A changed name, picture or price is reviewed again, and the item is off sale until it is; an
+  item the build no longer declares stops selling, and the players who own it keep it.
+- A game never sees a balance and cannot confirm a purchase.
+
+The rules a store is held to:
+
+| Rule | Code | Tier |
+|---|---|---|
+| Items change how a run looks and sounds, never how it plays. `owns()` is read in `src/App.tsx`; the store helper never appears in `src/game.ts`. | `GAME_STORE_IN_SIMULATION` | listing |
+| Every purchase goes through the platform's sheet: no price in money, no payment screen, no payment provider. | `GAME_OWN_PAYMENT` | listing |
+| The declared items keep the limits above. | `GAME_STORE_ITEMS_INVALID` | listing |
+| A player always sees exactly what they buy: no loot boxes, mystery items or paid draws, no item that expires, no countdown on a purchase. | `GAME_STORE_RANDOM` | review |
+| The game is fully playable without buying: no item unlocks a mode, a level, a board, a life or an advantage. | `GAME_STORE_GATES_PLAY` | review |
+| An item's name and picture show what the player gets. | `GAME_STORE_ITEM_MISLEADING` | review |
+
+A game's own currency (gems, coins) is earned by playing and never sold. Nothing is sold in a
+test run: with no host, `storeItems()` answers `[]`.
+
 ## 6. The test hook
 
 Required when `?bp_test=1` is present:
@@ -537,6 +595,7 @@ does not list.
 | `player.stats` | open | | `{ best, plays, lastPlayedAt }` for this game, or `null` when signed out; what the leaderboard already shows. |
 | `player.friends` | open | | `[{ displayName, avatar, best }]` for friends who played this game, or `null` when signed out. No ids, no items, no lookup by player. |
 | `player.save` | open | `{ op: 'get' }` or `{ op: 'set', data }` | `{ data, updatedAt }` for a read, `{ ok, updatedAt }` for a write, or `null` when signed out. One JSON value per player per game, at most 16 KB, private to that player. Use `src/beyondplay-save.ts` (section 5e). |
+| `store` | open | `{ op: 'items' }` or `{ op: 'buy', item }` | For `items`: `[{ id, name, blurb, image, price, onSale, owned }]`, the items declared with `defineStore`. For `buy`: `{ outcome: 'bought' \| 'owned' }` once the player owns the item; rejects with `cancelled` when the player closes the platform's sheet. Use `src/beyondplay-store.ts` (section 5f). |
 
 Tiers: `open` is answered without asking the player, which covers
 everything offered (phase one and, since 6 November 2026, phase two:

@@ -70,7 +70,9 @@ disclosure).
   with the disclaimer sentence the agreement prescribes, in the form "not
   affiliated with <the rights holder>". The platform's own characters carry
   no disclaimer. Without an agreement there is no fan game.
-- No earnings language and no purchase calls to action inside a game.
+- No earnings language and no purchase calls to action inside a game. An item
+  for sale shows its price with the HUD kit's `Price` chip and nothing more: no
+  "buy now", no "limited time", no countdown (contract section 5f).
 - Disclose AI-generated assets; do not present them as hand-made.
 - No profanity in title, description or tags.
 

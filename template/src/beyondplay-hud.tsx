@@ -7,6 +7,7 @@
 //     <HudRow at="bottom" left={<Stick onMove={move} />}
 //             right={<HudButton icon="dash" label="Dash" size={64} lit cooldown={cd} onPress={dash} />} />
 //   </Hud>
+//   <Price amount={150} label="Neon trail" onPress={() => buy('trail-neon')} />   // on a locked item
 //
 // Rules it keeps for you: nothing here starts, pauses or explains a game (the
 // feed card is already playing); every control is 44 px or larger; the top row
@@ -271,6 +272,44 @@ export function HudButton({ icon, label, onPress, size = 44, lit, cooldown = 0, 
       {keyHint && mode === 'keys' && (
         <span style={{ position: 'absolute', left: '50%', bottom: -10, transform: 'translateX(-50%)' }}><KeyCap lit={lit && ready}>{keyHint}</KeyCap></span>
       )}
+    </button>
+  );
+}
+
+/** The platform's coin: the one mark that means B-Bucks. */
+function Coin({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" style={{ flex: 'none', display: 'block' }}>
+      <defs>
+        <radialGradient id="bp-hud-coin" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#0441ff" /><stop offset="1" stopColor="#1da5ff" />
+        </radialGradient>
+      </defs>
+      <circle cx="32" cy="32" r="32" fill="url(#bp-hud-coin)" />
+      <path d="M37.3 32.82L49.08 42.71M37.3 32.82L37.88 43.88M37.3 32.82L20.9 48.94M37.3 32.82L25.96 32.03M37.3 32.82L20.13 15.65M37.3 32.82L36.74 20.01M37.3 32.82L48.67 20.42M37.3 32.82L49.04 31.9" fill="none" stroke="#fff" strokeWidth={6.4} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * The price of a locked item, in B-Bucks: the platform's coin and the amount. Put it on the item
+ * (after game over, or behind a small control: never before the first run) and call buy(id) from
+ * ./beyondplay-store in `onPress`; the platform's own sheet does the rest. An item the player owns
+ * shows "Owned" and takes no press. Never write a price in money and never draw a payment screen.
+ */
+export function Price({ amount, owned, onPress, label }: { amount: number; owned?: boolean; onPress?: () => void; /** What the press buys, for a screen reader: "Neon trail". */ label?: string }) {
+  const text = owned ? 'Owned' : fmt(amount);
+  return (
+    <button
+      type="button"
+      aria-label={owned ? `${label ?? 'Item'}: owned` : `${label ?? 'Item'}: ${fmt(amount)} B-Bucks`}
+      className={owned ? undefined : 'bp-hud-press'}
+      disabled={owned}
+      onPointerDown={(e) => { e.stopPropagation(); if (!owned && onPress) onPress(); }}
+      style={{ ...module(44), padding: owned ? '0 16px' : '0 16px 0 12px', gap: 6, pointerEvents: 'auto', touchAction: 'none', cursor: owned ? 'default' : 'pointer', color: owned ? HUD.open : HUD.ink }}
+    >
+      {!owned && <Coin size={20} />}
+      <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.2, fontVariantNumeric: 'tabular-nums' }}>{text}</span>
     </button>
   );
 }

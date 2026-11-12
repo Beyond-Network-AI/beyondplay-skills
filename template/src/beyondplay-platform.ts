@@ -32,12 +32,18 @@
 //                    (loadSave, writeSave), which also keeps a copy on the device; declare it:
 //                    uses: ['player.save']
 //
+// Phase 4:
+//   store            the game's own items for B-Bucks (cosmetics only): what is on sale, what this
+//                    player owns, and the platform's purchase sheet. Use src/beyondplay-store.ts
+//                    (storeItems, owns, buy); declare the items with its defineStore in the
+//                    config, which declares the store for you.
+//
 // The one rule for items: they change how a run looks and sounds, never how it
 // plays. A trait may pick the model, a trail, a sound, a greeting, the name on
 // the end card; nothing the simulation reads comes from an item or a trait.
 // Read items in src/App.tsx, never in src/game.ts.
 
-export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share' | 'player.items' | 'player.stats' | 'player.friends' | 'player.save';
+export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share' | 'player.items' | 'player.stats' | 'player.friends' | 'player.save' | 'store';
 
 export interface HostInfo {
   surface: 'feed' | 'page' | 'app' | 'telegram' | 'desktop' | 'unknown';
@@ -149,6 +155,28 @@ export type PlayerSaveParams = { op: 'get' } | { op: 'set'; data: unknown };
 /** The answer to a write. */
 export type PlayerSaveWrite = { ok: true; updatedAt: string } | { ok: false; reason: 'too_large' | 'invalid' | 'unavailable'; limit?: number };
 
+/** One item of the game's store, as the platform answers it. Look and sound only. */
+export interface StoreItem {
+  /** The id the game gave the item in defineStore. */
+  id: string;
+  name: string;
+  blurb: string | null;
+  /** The item's picture, served from the game. */
+  image: string | null;
+  /** The price in B-Bucks. */
+  price: number;
+  /** False while the item waits for review, was withdrawn, or the store is not open for this game. */
+  onSale: boolean;
+  /** True when this player owns it, on every device. Always false signed out. */
+  owned: boolean;
+}
+/** List the game's items, or ask the platform to sell one (it opens its own sheet). */
+export type StoreParams = { op: 'items' } | { op: 'buy'; item: string };
+/** The answer to a buy that ended with the player owning the item. */
+export interface StoreBuyResult {
+  outcome: 'bought' | 'owned';
+}
+
 export interface CapabilityParams {
   capabilities: undefined;
   host: undefined;
@@ -158,6 +186,7 @@ export interface CapabilityParams {
   'player.stats': undefined;
   'player.friends': undefined;
   'player.save': PlayerSaveParams;
+  store: StoreParams;
 }
 
 export interface CapabilityResults {
@@ -171,6 +200,8 @@ export interface CapabilityResults {
   'player.friends': PlayerFriend[] | null;
   /** A PlayerSave for a read, a PlayerSaveWrite for a write, null when signed out. */
   'player.save': PlayerSave | PlayerSaveWrite | null;
+  /** StoreItem[] for items; a StoreBuyResult for a buy (it rejects with cancelled when the player closes the sheet). */
+  store: StoreItem[] | StoreBuyResult;
 }
 
 /** Why a request was not answered with a result. */

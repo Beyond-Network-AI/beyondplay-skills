@@ -3,7 +3,7 @@ import { existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { checkSizeLimits, walk } from './files.js';
 import { checkBundle } from './game-bundle.js';
-import { checkConfig } from './game-config.js';
+import { checkConfig, checkStore } from './game-config.js';
 import { checkArt, checkAudioLicence, checkCapabilities, checkHud, checkLibraryCredits, checkPublishConfig, checkSmokeDriver, scanSource } from './game-scan.js';
 import { checkTemplate, resolveTemplateDir } from './game-template.js';
 import { GAME_SOURCE } from './limits.js';
@@ -20,6 +20,7 @@ export async function checkGame(dirArg, opts = {}) {
   const templateOwned = checkTemplate(dir, templateDir, report);
   // opts.skipConfig: the hosted check evaluates the config in its own build and has no esbuild.
   const manifest = opts.skipConfig ? null : await checkConfig(dir, report);
+  checkStore(dir, manifest, report);
   checkPublishConfig(dir, report);
   checkArt(dir, report);
   checkSmokeDriver(dir, report);

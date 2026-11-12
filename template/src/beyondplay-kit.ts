@@ -187,7 +187,16 @@ export function onMatchResult(cb: (result: MatchResult) => void): () => void {
 /** Build the beyondplay.json manifest from the declared kit calls. Called by scripts/emit-manifest.mjs
  *  at build (in Node) after importing beyondplay.config.ts. Maps the declaration to a ChallengeUnit. */
 export function buildManifest() {
-  return withUses(buildDuelManifest());
+  return withStore(withUses(buildDuelManifest()));
+}
+
+/** The store the config declared with defineStore (src/beyondplay-store.ts), when it declared one:
+ *  the items, and the 'store' capability with them. */
+function withStore<T extends { uses?: string[] }>(manifest: T): T & { store?: { items: unknown[] } } {
+  const decl = (globalThis as any).__bpStore;
+  if (!decl || !Array.isArray(decl.items)) return manifest;
+  const uses = (manifest.uses ?? []).includes('store') ? manifest.uses : [...(manifest.uses ?? []), 'store'];
+  return { ...manifest, uses, store: { items: decl.items.map((i: object) => ({ ...i })) } };
 }
 
 /** The capabilities the config declared (declareUses / defineSoloGame({ uses })), when any. */
