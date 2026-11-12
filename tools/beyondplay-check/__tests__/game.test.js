@@ -117,6 +117,27 @@ describe('beyondplay-check game', () => {
     expect(issue(r, 'GAME_HUD_NOT_KIT')).toMatchObject({ severity: 'warning', tier: 'review', path: 'src/App.tsx' });
   });
 
+  it('a challenge with no bound on its winning side is noted for the reviewer', async () => {
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_SCORE_UNBOUNDED');
+    const config = join(dir, 'src/beyondplay.config.ts');
+    writeFileSync(config, readFileSync(config, 'utf8').replace(/^\s*maxValue:.*\n/m, ''));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(issue(r, 'GAME_SCORE_UNBOUNDED')).toMatchObject({ severity: 'warning', tier: 'review', path: 'src/beyondplay.config.ts' });
+    expect(issue(r, 'GAME_SCORE_UNBOUNDED').message).toContain('maxValue');
+  });
+
+  it('the animation helper may not be edited, and a game may ship without it', async () => {
+    append(join(dir, 'src/beyondplay-anim.ts'), 'export const mine = 1;');
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-anim.ts' });
+    rmSync(join(dir, 'src/beyondplay-anim.ts'));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MODIFIED');
+  });
+
   it('a library asset needs its line in CREDITS.md, and the asset host is not an external request', async () => {
     write(join(dir, 'public/assets/library/sfx-core/coin/coin-01.ogg'), Buffer.alloc(64, 1));
     append(join(dir, 'src/App.tsx'), "const kitBase = 'https://assets.beyondplay.xyz/library/v0/music-core/loop/arcade-level-1.ogg';");

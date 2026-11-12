@@ -92,6 +92,11 @@ export async function checkConfig(gameDir, report) {
     if (d[k] !== undefined && !Number.isFinite(d[k])) bad(`${k} must be a finite number`, 'Set sane score bounds or omit them.');
   }
   if (Number.isFinite(d.minValue) && Number.isFinite(d.maxValue) && d.minValue > d.maxValue) bad('minValue is greater than maxValue', 'Swap or fix the bounds.');
+  // The bound on the winning side: the server rejects a value past it, so a bug that lets a score run free never reaches the board.
+  const winning = d.lowerIsBetter === true ? 'minValue' : 'maxValue';
+  if (!Number.isFinite(d[winning])) {
+    report.warning('GAME_SCORE_UNBOUNDED', CONFIG_REL, `defineChallenge declares no ${winning}: the server accepts any ${d.lowerIsBetter === true ? 'low' : 'high'} value, so a bug that lets a score run free reaches the board.`, `Set ${winning} just ${d.lowerIsBetter === true ? 'below' : 'above'} the best an honest run can reach, from the game's own numbers.`, { docs: DOCS.contract });
+  }
 
   const unit = Array.isArray(manifest && manifest.challenge) ? manifest.challenge[0] : null;
   if (!unit || manifest.playerMode !== 'duel') {
