@@ -297,6 +297,7 @@ Breaking any of these ships a broken game or a rejected one.
 - [ ] `challenge.submit()` runs once per run; restart works from the in-page button and from `bp_play_again`
 - [ ] Boots into play; `bp_ready` fires once after the first draw; no how-to text; idle survives 12 s
 - [ ] Portrait screenshots inspected; text readable at phone size; canvas fills the viewport
+- [ ] The score, timer, lives, buttons and the end card come from the HUD kit (`src/beyondplay-hud.tsx`, contract section 5b); status on top, controls at the bottom, the middle empty
 - [ ] No external requests in the network log beyond the platform and the template's font
 - [ ] No brand names or third-party IP; fan disclaimer present where required; no emoji
 - [ ] The asset library was searched first (`search_assets`, `add_asset` on the creator MCP); the game has a sound set and a music loop, played through `src/beyondplay-audio.ts`
