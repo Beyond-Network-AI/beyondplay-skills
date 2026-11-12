@@ -118,6 +118,7 @@ export class RunnerScene {
   private blink = 0;    // seconds of blinking left after a hit
   private spin = 0;
   private disposed = false;
+  private warned = false;
 
   /** `test` keeps the drawing readable for the platform's render check (?bp_test=1); leave it off in play. */
   constructor(canvas: HTMLCanvasElement, test = false) {
@@ -235,6 +236,8 @@ export class RunnerScene {
         else if (cell === HIGH && h < 48) this.place(this.highs, h++, x, 0, row.z);
       }
     }
+    // An obstacle past its pool is not drawn but still hits: if you make the rows denser, raise the pools.
+    if ((w === 48 || l === 48 || h === 48) && !this.warned) { this.warned = true; console.warn('runner: an obstacle pool is full; some obstacles are not drawn. Raise the pool sizes in scene.ts.'); }
     this.walls.count = w; this.lows.count = l; this.highs.count = h;
     this.walls.instanceMatrix.needsUpdate = this.lows.instanceMatrix.needsUpdate = this.highs.instanceMatrix.needsUpdate = true;
 

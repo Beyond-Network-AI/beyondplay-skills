@@ -9,7 +9,10 @@ export const challenge = defineChallenge({
   seed: true,               // the course is drawn from the match seed
   instanceKind: 'random',
   minValue: 0,
-  maxValue: 4000,           // the server rejects values outside the bounds
+  // Just above the best an honest run can reach: 660 m in sixty seconds plus ten a coin is about
+  // 2,800. Change it whenever the speed, the run length or the scoring changes; the server rejects
+  // values outside the bounds, so a bug that lets a score run free cannot reach the board.
+  maxValue: 4000,
 });
 
 // `uses` names the platform capabilities the game asks for through

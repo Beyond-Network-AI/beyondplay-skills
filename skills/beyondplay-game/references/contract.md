@@ -101,9 +101,23 @@ defineChallenge({ metricLabel: 'Time', lowerIsBetter: true, seed: false,
                   instanceKind: 'static', minValue: 1, maxValue: 600 });
 ```
 
-Set `maxValue` above any honest run but below what a cheat would post; the
-shipped games use 8000 (ten baskets), 100000 (endless climb) and 200000
-(long runner).
+Set `maxValue` just above the best an honest run can reach, worked out from the game's own numbers
+(run length, top speed, points per pickup), and change it whenever they change; the shipped games
+use 8000 (ten baskets) and 4000 (a sixty second runner). A challenge with no bound on its winning
+side is `GAME_SCORE_UNBOUNDED` (review tier): the server rejects a value past the bound, so a bug
+that lets a score run free never reaches the board.
+
+**A run always ends, and no score is free** (`GAME_RUN_NEVER_ENDS`, review tier). Two ways a game
+breaks this, both seen in a shipped runner whose best run reached 109,000 for nothing:
+
+- The content runs out. A course planned once to a fixed length ends somewhere, and past its end
+  there is nothing to hit. End the run by the clock, or plan the content a chunk at a time ahead of
+  the player, each chunk its own stream of the seed, so there is always more and both duelists
+  still get the same course.
+- The difficulty goes flat. In an endless game keep one thing rising for as long as a run can last
+  (the speed, how little room an obstacle leaves) until nobody gets through.
+
+Try the game with a driver that never misses: its run must still end.
 
 ## 3. `dist/beyondplay.json`
 

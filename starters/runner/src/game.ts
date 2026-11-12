@@ -12,6 +12,17 @@
 //     same seed and the same inputs give the same run, hash and score anywhere.
 //   - The engine knows nothing about meshes, clips or sound: the shell listens
 //     to its events and shows them.
+//
+// A run must end, and no score is free:
+//   - The course never runs out. It is planned a chunk at a time, ahead of the
+//     runner, each chunk its own stream of the seed (planChunk). A course drawn
+//     once to a fixed length ends somewhere, and past its end there is nothing
+//     to hit: the score climbs for nothing.
+//   - This starter ends a run by the clock (RUN_STEPS). If you make it endless,
+//     keep the difficulty rising for as long as a run can last (the speed, how
+//     little room a row leaves) until nobody gets through; never let it go flat.
+//   - Set maxValue in src/beyondplay.config.ts from these numbers: just above
+//     the best an honest run can reach.
 
 export const DT = 1 / 120;
 export const RUN_STEPS = Math.round(60 / DT); // a 60 second run
@@ -25,8 +36,9 @@ const JUMP_SPEED = 7;       // 0.64 s in the air, 1.1 m at the top
 const SLIDE_STEPS = Math.round(0.7 / DT);
 const SAFE_STEPS = Math.round(1 / DT);  // no second hit for a second after one
 const CLEAR_HEIGHT = 0.6;   // a low obstacle is cleared above this
-const COURSE_START = 30;
-const COURSE_END = 820;
+const COURSE_START = 30;    // metres of clear road before the first row
+const CHUNK = 400;          // metres of course planned at a time
+const PLAN_LEAD = 120;      // plan the next chunk when the runner is this close to the end of the plan (more than is drawn ahead)
 
 /** What stands in one lane of a row. */
 export const NONE = 0;
@@ -90,6 +102,8 @@ export class RunnerGame {
   private slideOnLand = false;
   private nextRow = 0;
   private nextCoin = 0;
+  private planEnd = 0;   // the course is planned up to here (metres)
+  private chunk = 0;     // how many chunks are planned
   private queue = new Map<number, Verb[]>();
   private readonly cosmetic = mulberry32(0x9e3779b9); // never touches gameplay
 
@@ -97,15 +111,18 @@ export class RunnerGame {
     this.reset();
   }
 
-  reset(): void {
-    const rng = mulberry32(xmur3(this.seed ?? 'solo-fallback-seed')());
+  /**
+   * Plan the next chunk of the course. Each chunk is its own stream of the seed, so the course is
+   * the same for both players however far a run gets, and there is always more of it.
+   */
+  private planChunk(): void {
+    const rng = mulberry32(xmur3(`${this.seed ?? 'solo-fallback-seed'}:${this.chunk}`)());
     const pick = <T,>(list: readonly T[]): T => list[Math.floor(rng() * list.length)];
-    this.rows = [];
-    this.coinList = [];
-    let z = COURSE_START;
-    for (let n = 0; z < COURSE_END; n++) {
+    const end = this.planEnd + CHUNK;
+    let z = this.chunk === 0 ? COURSE_START : this.planEnd;
+    while (z < end) {
       const cells: [Cell, Cell, Cell] = [NONE, NONE, NONE];
-      const p = n < 3 ? rng() * 0.45 : rng(); // the first rows are the easy kinds
+      const p = this.rows.length < 3 ? rng() * 0.45 : rng(); // the first rows are the easy kinds
       if (p < 0.25) cells[1 + pick(LANES)] = WALL;
       else if (p < 0.45) cells[1 + pick(LANES)] = LOW;
       else if (p < 0.6) { const open = pick(LANES); for (const l of LANES) if (l !== open) cells[1 + l] = WALL; }
@@ -124,6 +141,16 @@ export class RunnerGame {
       for (let i = 0; i < 5; i++) this.coinList.push({ z: z + gap / 2 + (i - 2) * 1.6, lane, taken: false });
       z += gap;
     }
+    this.planEnd = z;
+    this.chunk += 1;
+  }
+
+  reset(): void {
+    this.rows = [];
+    this.coinList = [];
+    this.planEnd = 0;
+    this.chunk = 0;
+    this.planChunk();
     this.phase = 'playing';
     this.finished = false;
     this.score = 0; this.step = 0; this.hash = 2166136261;
@@ -182,6 +209,7 @@ export class RunnerGame {
 
     this.speed = Math.min(SPEED_END, SPEED_START + (SPEED_END - SPEED_START) * (this.step / RUN_STEPS));
     this.z += this.speed * DT;
+    while (this.z + PLAN_LEAD > this.planEnd) this.planChunk(); // the course never runs out
 
     if (this.y > 0 || this.vy > 0) {
       this.vy -= GRAVITY * DT;
