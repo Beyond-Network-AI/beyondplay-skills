@@ -26,12 +26,18 @@
 //   player.stats     { best, plays, lastPlayedAt } for this game, or null
 //   player.friends   [{ displayName, avatar, best }] for friends who played this game, or null
 //
+// Phase 3:
+//   player.save      the player's saved progress in this game: one JSON value of at most 16 KB,
+//                    private to that player, null when signed out. Use src/beyondplay-save.ts
+//                    (loadSave, writeSave), which also keeps a copy on the device; declare it:
+//                    uses: ['player.save']
+//
 // The one rule for items: they change how a run looks and sounds, never how it
 // plays. A trait may pick the model, a trail, a sound, a greeting, the name on
 // the end card; nothing the simulation reads comes from an item or a trait.
 // Read items in src/App.tsx, never in src/game.ts.
 
-export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share' | 'player.items' | 'player.stats' | 'player.friends';
+export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share' | 'player.items' | 'player.stats' | 'player.friends' | 'player.save';
 
 export interface HostInfo {
   surface: 'feed' | 'page' | 'app' | 'telegram' | 'desktop' | 'unknown';
@@ -133,6 +139,16 @@ export interface PlayerFriend {
   best: number | null;
 }
 
+/** The player's saved progress in this game: the value the game last wrote and when (null and null when nothing is saved). */
+export interface PlayerSave {
+  data: unknown | null;
+  updatedAt: string | null;
+}
+/** Read the save, or write a new value (JSON, at most 16 KB). */
+export type PlayerSaveParams = { op: 'get' } | { op: 'set'; data: unknown };
+/** The answer to a write. */
+export type PlayerSaveWrite = { ok: true; updatedAt: string } | { ok: false; reason: 'too_large' | 'invalid' | 'unavailable'; limit?: number };
+
 export interface CapabilityParams {
   capabilities: undefined;
   host: undefined;
@@ -141,6 +157,7 @@ export interface CapabilityParams {
   'player.items': PlayerItemsParams;
   'player.stats': undefined;
   'player.friends': undefined;
+  'player.save': PlayerSaveParams;
 }
 
 export interface CapabilityResults {
@@ -152,6 +169,8 @@ export interface CapabilityResults {
   'player.items': PlayerItem[] | null;
   'player.stats': PlayerStats | null;
   'player.friends': PlayerFriend[] | null;
+  /** A PlayerSave for a read, a PlayerSaveWrite for a write, null when signed out. */
+  'player.save': PlayerSave | PlayerSaveWrite | null;
 }
 
 /** Why a request was not answered with a result. */

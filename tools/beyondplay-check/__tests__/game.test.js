@@ -250,6 +250,22 @@ describe('beyondplay-check game', () => {
     expect(issue(r, 'GAME_SHARE_BUTTON')).toMatchObject({ severity: 'warning', tier: 'listing' });
   });
 
+  it('importing the save helper is using player.save: it must be declared, and the helper may not be edited', async () => {
+    append(join(dir, 'src/App.tsx'), "import { loadSave, writeSave } from './beyondplay-save';\nvoid loadSave({ gems: 0 }).then((s) => writeSave(s));");
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.facts.uses).toEqual(['player.save', 'share']);
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED')).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/App.tsx' });
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED').message).toContain('player.save');
+    const config = join(dir, 'src/beyondplay.config.ts');
+    writeFileSync(config, readFileSync(config, 'utf8').replace("uses: ['share']", "uses: ['share', 'player.save']"));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNKNOWN');
+    append(join(dir, 'src/beyondplay-save.ts'), 'export const mine = 1;');
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-save.ts' });
+  });
+
   it('a config without uses still passes when the game requests nothing; skipConfig checks only the names', async () => {
     writeFileSync(join(dir, 'src/beyondplay.config.ts'), "import { defineSoloGame } from './beyondplay-kit';\nexport const game = defineSoloGame({});\n");
     const r = await checkGame(dir, { template: TEMPLATE, skipConfig: true });
