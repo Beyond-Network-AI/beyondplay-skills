@@ -18,6 +18,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/beyondplay-platform.ts` | platform | `request`, `capabilities`, `can`, `onCapabilities`: the platform capabilities (section 9). Import it; do not edit it. |
 | `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it (an edited copy is scanned as the game's own code). |
 | `src/beyondplay-audio.ts` | platform | `loadSound`, `play`, `startMusic`, `setMuted`: sound effects and a music loop (section 5a). Import it; do not edit it. |
+| `src/beyondplay-hud.tsx` | platform | `Hud`, `HudRow`, `Stat`, `Timer`, `Hearts`, `Meter`, `Callout`, `HudButton`, `Stick`, `EndCard`, `setHudTheme`: what shows over the play (section 5b). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
 | `tsconfig.json`, `vite.config.ts` | platform | Strict TypeScript; shared Vite settings. |
@@ -245,6 +246,63 @@ Nothing sounds before the player's first touch (music waits for it); audio loads
 frame and never blocks play; the game goes quiet when its card scrolls away; the checks run silent
 under `?bp_test=1`. Budgets: a sound set under 1 MB, a music loop under 1.5 MB. Sound is look and
 feel only: the simulation never reads it.
+
+## 5b. The HUD kit
+
+Build everything that shows over the play from `src/beyondplay-hud.tsx`: it is sized for a thumb,
+readable over a dark or a bright scene, clear of the notch and the home bar, and it adapts to a
+large screen and a keyboard without any work in the game.
+
+```tsx
+import { Hud, HudRow, HudGroup, Stat, Timer, Hearts, Meter, Callout, HudButton, Stick, EndCard, setHudTheme } from './beyondplay-hud';
+
+<Hud>
+  <HudRow at="top"
+    left={<><Stat value={score} large /><Hearts value={lives} max={4} /></>}
+    center={<Timer seconds={left} />}
+    right={<><HudButton icon={muted ? 'mute' : 'sound'} label="Sound" onPress={toggleMute} /><Stat icon="gem" value={gems} /></>}
+    wide={<Meter value={xp} max={xpToNext} label="Level 1" />} />
+  <Callout text={event} />
+  <HudRow at="bottom"
+    left={<Stick onMove={(x, y) => input.set(x, y)} keys="wasd" />}
+    right={<HudGroup gap={12}>
+      <HudButton icon="shield" label="Shield" size={52} cooldown={shieldCd} keyHint="E" onPress={shield} />
+      <HudButton icon="dash" label="Dash" size={64} lit keyHint="Space" onPress={dash} />
+    </HudGroup>} />
+</Hud>
+{over && <EndCard score={over.score} best={best} lines={['52 streak']} onPlayAgain={restart} onShare={canShare ? share : undefined} />}
+```
+
+The layout, on every screen:
+
+- **Top row is status** (what the player has): the score top left, time top centre, sound top
+  right. At most five pieces, and one line across the full width (`wide`) for a level or boss bar.
+- **Bottom row is controls** (what the player does): movement under the left thumb, one 64 px
+  action and at most one 52 px second action under the right. A one-thumb game needs no controls
+  at all: the whole screen is the button.
+- **The middle stays empty**, except a `Callout` of one or two words for a moment.
+- **One lit element at a time** (`lit`, or `tone="lit"`): the thing that matters right now.
+- Nothing in the kit starts, pauses or explains a game, and the game adds none of those.
+- A control fires on touch-down and never moves the player itself: it records an input the
+  engine reads at its next step.
+
+On a desktop and in full screen (where the platform plays the game on a landscape stage):
+
+- The HUD **grows with the stage**, from 1 at phone size to 1.5 at 720 px and taller, and stays
+  in the corners; it never stretches across a wide screen and nothing is re-laid out by the game.
+- **Keys replace thumbs.** A `HudButton` with `keyHint` shows its key cap while the player uses a
+  keyboard, and a `Stick` with `keys` gives way to its keys, which fade after the first press. A
+  touch brings the stick back. The game reads the keyboard itself and declares the keys.
+- **The host owns the frame**: Full screen, Esc, the key hint line under the title, and the
+  result card with Play again (`R`) on the desktop. A game draws no full-screen button, no title
+  and no key instructions of its own.
+- Keep the play itself inside the centre 4:3 of a wide stage, so nothing the player must see sits
+  under the corners' HUD at any aspect from 9:19.5 to 21:9.
+
+`setHudTheme({ lit: '#35e0c8' })` changes the kit's colours for one game (ink, lit, open, danger,
+smoke, line, font); call it once before the first render. The file itself is platform-owned: an
+edited copy is `GAME_TEMPLATE_FILE_MODIFIED`. A game that draws its own HUD is noted for the
+reviewer (`GAME_HUD_NOT_KIT`, review tier). Ask the platform for a piece the kit lacks.
 
 ## 6. The test hook
 

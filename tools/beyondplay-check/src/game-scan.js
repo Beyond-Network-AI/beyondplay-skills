@@ -206,6 +206,18 @@ export function checkLibraryCredits(gameDir, files, report) {
   report.warning('GAME_LIBRARY_CREDIT_MISSING', missing[0].rel, `${missing.length} library asset${missing.length === 1 ? ' has' : 's have'} no line in CREDITS.md: ${names}${missing.length > 3 ? ', ...' : ''}.`, 'Add the credits line add_asset gave for each (under "## Library assets" in CREDITS.md), or remove the file.', { docs: DOCS.playbookAudio });
 }
 
+/**
+ * The HUD kit: a game that draws its own score, buttons and end card is noted for the reviewer.
+ * A game that imports the kit anywhere in src/ passes; the check never blocks a build.
+ */
+export function checkHud(files, report) {
+  const sources = files.filter((f) => /^src\/.+\.(tsx?|jsx?)$/.test(f.rel) && f.rel !== 'src/beyondplay-hud.tsx');
+  if (!sources.length) return;
+  const uses = sources.some((f) => /from\s+['"]\.{1,2}\/(?:[\w-]+\/)*beyondplay-hud['"]/.test(readFileSync(f.abs, 'utf8')));
+  if (uses) return;
+  report.warning('GAME_HUD_NOT_KIT', 'src/App.tsx', 'The game does not use the HUD kit (src/beyondplay-hud.tsx) for what it shows over the play.', 'Build the score, the timer, lives, buttons and the end card from ./beyondplay-hud (Hud, HudRow, Stat, Timer, Hearts, Meter, HudButton, Stick, EndCard); setHudTheme() changes its colours.');
+}
+
 /** A `uses` entry split into the capability and, for player.items, its collection ('player.items:cobi'). */
 export function parseUse(entry) {
   const i = entry.indexOf(':');

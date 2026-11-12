@@ -101,6 +101,22 @@ describe('beyondplay-check game', () => {
     rmSync(warn, { recursive: true, force: true });
   });
 
+  it('the HUD kit may not be edited, and a game that does not use it is noted for the reviewer', async () => {
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_HUD_NOT_KIT');
+    append(join(dir, 'src/beyondplay-hud.tsx'), 'export const mine = 1;');
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-hud.tsx' });
+    // A game scaffolded before the kit existed has no copy: drift, not an error; its own HUD is a review note.
+    rmSync(join(dir, 'src/beyondplay-hud.tsx'));
+    const app = join(dir, 'src/App.tsx');
+    writeFileSync(app, readFileSync(app, 'utf8').replace(/^import \{[^}]*\} from '\.\/beyondplay-hud';\n/m, 'const Hud = (p) => p.children; const HudRow = () => null; const Stat = () => null; const Meter = () => null; const EndCard = () => null;\n'));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MODIFIED');
+    expect(issue(r, 'GAME_HUD_NOT_KIT')).toMatchObject({ severity: 'warning', tier: 'review', path: 'src/App.tsx' });
+  });
+
   it('a library asset needs its line in CREDITS.md, and the asset host is not an external request', async () => {
     write(join(dir, 'public/assets/library/sfx-core/coin/coin-01.ogg'), Buffer.alloc(64, 1));
     append(join(dir, 'src/App.tsx'), "const kitBase = 'https://assets.beyondplay.xyz/library/v0/music-core/loop/arcade-level-1.ogg';");

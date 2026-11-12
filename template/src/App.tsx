@@ -4,13 +4,14 @@ import { challenge } from './beyondplay.config';
 import { getMatch } from './beyondplay-kit';
 import { haptic } from './haptics';
 import { can, onCapabilities, request } from './beyondplay-platform';
+import { EndCard, Hud, HudRow, Meter, Stat } from './beyondplay-hud';
 
 // The shell: one canvas, a HUD, an end card. It converts real time into whole
-// engine steps and draws; it never decides gameplay. Replace the drawing and
-// the HUD with your game's; keep the loop, the hold, the ready call, the single
-// submit, the replay paths and the test hook.
+// engine steps and draws; it never decides gameplay. Replace the drawing with
+// your game's and build what shows over it from the HUD kit (./beyondplay-hud);
+// keep the loop, the hold, the ready call, the single submit, the replay paths
+// and the test hook.
 const DT_MS = DT * 1000;
-const FONT = "'Geist', system-ui, -apple-system, sans-serif";
 
 interface Spark { x: number; y: number; vx: number; vy: number; life: number }
 
@@ -197,32 +198,21 @@ export default function App() {
   return (
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', touchAction: 'none' }}>
       <canvas ref={canvasRef} style={{ display: 'block', touchAction: 'none' }} />
-      <div style={{ position: 'absolute', top: 'max(16px, env(safe-area-inset-top))', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none', fontFamily: FONT }}>
-        <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: -1 }}>{score}</div>
-        <div style={{ fontSize: 13, opacity: 0.6, marginTop: 2 }}>{Math.min(round + 1, ROUNDS)} / {ROUNDS}</div>
-      </div>
+      <Hud>
+        <HudRow
+          at="top"
+          center={<Stat value={score} large />}
+          wide={<Meter value={Math.min(round + 1, ROUNDS)} max={ROUNDS} label={`${Math.min(round + 1, ROUNDS)} / ${ROUNDS}`} width={160} />}
+        />
+      </Hud>
       {over && (
-        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(5, 8, 20, 0.72)', fontFamily: FONT }}>
-          <div style={{ textAlign: 'center', padding: 28, borderRadius: 24, background: '#141c3a', minWidth: 240 }}>
-            <div style={{ fontSize: 13, opacity: 0.6, letterSpacing: 2 }}>SCORE</div>
-            <div style={{ fontSize: 56, fontWeight: 800, letterSpacing: -2 }}>{over.score}</div>
-            <div style={{ fontSize: 14, opacity: 0.75, marginTop: 4 }}>{over.hits} hits, {over.perfects} perfect</div>
-            <button
-              onPointerUp={() => { setOver(null); gameRef.current?.reset(); }}
-              style={{ marginTop: 20, padding: '14px 28px', borderRadius: 999, border: 0, background: '#f5b942', color: '#1a1300', fontSize: 16, fontWeight: 800, fontFamily: FONT, touchAction: 'manipulation' }}
-            >
-              Play again
-            </button>
-            {canShare && (
-              <button
-                onPointerUp={() => { request('share', { score: over.score }).catch(() => { /* dismissed, or not offered here */ }); }}
-                style={{ display: 'block', margin: '12px auto 0', padding: '10px 22px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: FONT, touchAction: 'manipulation' }}
-              >
-                Share
-              </button>
-            )}
-          </div>
-        </div>
+        <EndCard
+          score={over.score}
+          lines={[`${over.hits} hits`, `${over.perfects} perfect`]}
+          onPlayAgain={() => { setOver(null); gameRef.current?.reset(); }}
+          // The platform's share, only where the host offers it; dismissed or not offered is not an error.
+          onShare={canShare ? () => { request('share', { score: over.score }).catch(() => {}); } : undefined}
+        />
       )}
     </div>
   );

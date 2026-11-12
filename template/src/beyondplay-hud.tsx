@@ -16,7 +16,16 @@
 // Layout: status at the top (what the player has), controls at the bottom (what
 // the player does): movement under the left thumb, one 64 px action and at most
 // one 52 px second action under the right. Keep the middle of the screen empty.
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+//
+// On a large screen (a landscape or full-screen stage on a desktop) the same HUD
+// grows with the stage, up to one and a half times, and stays in the corners. When
+// the player uses a keyboard, a control that names its key shows a key cap and the
+// stick gives way to its keys, which fade once the player has used them. The host
+// owns Full screen, Esc and the key hint line; a game draws none of those.
+//
+// PLATFORM-OWNED. Do not edit: the validator compares this file with the template.
+// Change its colours with setHudTheme(); ask the platform for a piece it lacks.
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 export interface HudTheme {
   ink: string; lit: string; open: string; danger: string; smoke: string; line: string; font: string;
@@ -44,8 +53,46 @@ const CSS = `
 .bp-hud-pop { display: inline-block; animation: bp-hud-pop 150ms cubic-bezier(0.2, 0, 0, 1); }
 .bp-hud-press { transition: transform 100ms cubic-bezier(0.2, 0, 0, 1); }
 .bp-hud-press:active { transform: scale(0.92); }
+@media (hover: hover) { .bp-hud-press:hover { filter: brightness(1.18); } }
 @media (prefers-reduced-motion: reduce) { .bp-hud-pop, .bp-hud-callout, .bp-hud-rise, .bp-hud-pulse { animation: none !important; } .bp-hud-press { transition: none; } }
 `;
+// ---------------------------------------------------------------- screen and input
+/** How much larger the HUD draws: 1 on a phone, up to 1.5 on a large stage. */
+export function hudScaleFor(width: number, height: number): number {
+  return Math.max(1, Math.min(1.5, Math.min(width, height) / 480));
+}
+function useHudScale(): number {
+  const [scale, setScale] = useState(() => hudScaleFor(window.innerWidth, window.innerHeight));
+  useEffect(() => {
+    const on = () => setScale(hudScaleFor(window.innerWidth, window.innerHeight));
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  return scale;
+}
+
+/** What the player is holding: 'touch' (and a mouse on its own) or 'keys' once a key is pressed. */
+export type InputMode = 'touch' | 'keys';
+function useInputMode(): InputMode {
+  const [mode, setMode] = useState<InputMode>(() => (window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'keys'));
+  useEffect(() => {
+    const keys = () => setMode('keys');
+    const touch = (e: PointerEvent) => { if (e.pointerType === 'touch') setMode('touch'); };
+    window.addEventListener('keydown', keys);
+    window.addEventListener('pointerdown', touch, true);
+    return () => { window.removeEventListener('keydown', keys); window.removeEventListener('pointerdown', touch, true); };
+  }, []);
+  return mode;
+}
+const HudContext = createContext<{ scale: number; mode: InputMode }>({ scale: 1, mode: 'touch' });
+
+/** A key as the player sees it on the keyboard. */
+function KeyCap({ children, lit }: { children: ReactNode; lit?: boolean }) {
+  return (
+    <span style={{ minWidth: 22, height: 22, padding: '0 6px', borderRadius: 6, background: lit ? HUD.lit : HUD.ink, color: '#1a1300', fontFamily: HUD.font, fontSize: 12, fontWeight: 700, lineHeight: '22px', textAlign: 'center', boxSizing: 'border-box', boxShadow: '0 2px 0 rgba(0, 0, 0, 0.45)', display: 'inline-block', whiteSpace: 'nowrap' }}>{children}</span>
+  );
+}
+
 function useHudStyle(): void {
   useEffect(() => {
     if (document.getElementById('bp-hud-style')) return;
@@ -96,10 +143,15 @@ export function Icon({ name, size = 20, color, filled }: { name: IconName; size?
 /** The overlay. Put it after the canvas; it never takes a touch itself. */
 export function Hud({ children }: { children?: ReactNode }) {
   useHudStyle();
+  const scale = useHudScale();
+  const mode = useInputMode();
+  // `zoom` scales the layout, not a picture of it: the rows stay on the stage's edges at any size.
   return (
-    <div data-bp-hud="" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', fontFamily: HUD.font, color: HUD.ink, WebkitFontSmoothing: 'antialiased' }}>
-      {children}
-    </div>
+    <HudContext.Provider value={{ scale, mode }}>
+      <div data-bp-hud="" data-bp-hud-mode={mode} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', fontFamily: HUD.font, color: HUD.ink, WebkitFontSmoothing: 'antialiased', zoom: scale }}>
+        {children}
+      </div>
+    </HudContext.Provider>
   );
 }
 
@@ -197,7 +249,8 @@ export function Callout({ text, tone = 'lit' }: { text: string | null; tone?: To
  * It fires on touch-down, so an action is never a frame late. `cooldown` (1 just used,
  * 0 ready) draws the ring; `lit` marks the one control that matters right now.
  */
-export function HudButton({ icon, label, onPress, size = 44, lit, cooldown = 0, disabled }: { icon: IconName; label: string; onPress: () => void; size?: 44 | 52 | 64; lit?: boolean; cooldown?: number; disabled?: boolean }) {
+export function HudButton({ icon, label, onPress, size = 44, lit, cooldown = 0, disabled, keyHint }: { icon: IconName; label: string; onPress: () => void; size?: 44 | 52 | 64; lit?: boolean; cooldown?: number; disabled?: boolean; /** The key that does the same, as printed on it: "Space", "Shift", "E". Shown while the player uses a keyboard. */ keyHint?: string }) {
+  const { mode } = useContext(HudContext);
   const ready = cooldown <= 0 && !disabled;
   const r = size / 2 - 3;
   const round = 2 * Math.PI * r;
@@ -215,6 +268,9 @@ export function HudButton({ icon, label, onPress, size = 44, lit, cooldown = 0, 
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={HUD.lit} strokeWidth={3} strokeLinecap="round" strokeDasharray={round} strokeDashoffset={round * Math.min(1, cooldown)} />
         </svg>
       )}
+      {keyHint && mode === 'keys' && (
+        <span style={{ position: 'absolute', left: '50%', bottom: -10, transform: 'translateX(-50%)' }}><KeyCap lit={lit && ready}>{keyHint}</KeyCap></span>
+      )}
     </button>
   );
 }
@@ -222,31 +278,35 @@ export function HudButton({ icon, label, onPress, size = 44, lit, cooldown = 0, 
 /**
  * A thumb stick: touch anywhere in its pad and drag. `onMove` gets x and y from -1 to 1
  * (y up is negative) on every change and (0, 0) on release. Feed the value to the engine
- * at the next step; never move the player from here.
+ * at the next step; never move the player from here. Name the keys that move the player
+ * (`keys`) and, while the player uses a keyboard, the stick gives way to those keys, which
+ * fade after the first press. The game reads the keys itself.
  */
-export function Stick({ onMove, size = 132 }: { onMove: (x: number, y: number) => void; size?: number }) {
+export function Stick({ onMove, size = 132, keys }: { onMove: (x: number, y: number) => void; size?: number; keys?: 'wasd' | 'arrows' }) {
+  const { scale, mode } = useContext(HudContext);
   const [knob, setKnob] = useState({ x: 0, y: 0, held: false });
   const origin = useRef<{ id: number; x: number; y: number } | null>(null);
   const reach = size / 2 - 26;
   const move = (cx: number, cy: number) => {
     const o = origin.current;
     if (!o) return;
-    let dx = cx - o.x;
-    let dy = cy - o.y;
+    let dx = (cx - o.x) / scale;
+    let dy = (cy - o.y) / scale;
     const d = Math.hypot(dx, dy);
     if (d > reach) { dx = (dx / d) * reach; dy = (dy / d) * reach; }
     setKnob({ x: dx, y: dy, held: true });
     onMove(dx / reach, dy / reach);
   };
   const end = () => { origin.current = null; setKnob({ x: 0, y: 0, held: false }); onMove(0, 0); };
+  if (keys && mode === 'keys') return <MoveKeys keys={keys} />;
   return (
     <div
       role="application"
       aria-label="Move"
       onPointerDown={(e) => {
         e.stopPropagation();
-        const box = e.currentTarget.getBoundingClientRect();
-        origin.current = { id: e.pointerId, x: box.left + box.width / 2, y: box.top + box.height / 2 };
+        // The stick starts where the thumb lands: no need to find its centre.
+        origin.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
         e.currentTarget.setPointerCapture(e.pointerId);
         move(e.clientX, e.clientY);
       }}
@@ -260,6 +320,27 @@ export function Stick({ onMove, size = 132 }: { onMove: (x: number, y: number) =
   );
 }
 
+const MOVE_KEYS: Record<'wasd' | 'arrows', { caps: [string, string, string, string]; keys: string[] }> = {
+  wasd: { caps: ['W', 'A', 'S', 'D'], keys: ['w', 'a', 's', 'd'] },
+  arrows: { caps: ['\u2191', '\u2190', '\u2193', '\u2192'], keys: ['arrowup', 'arrowleft', 'arrowdown', 'arrowright'] },
+};
+/** The movement keys, drawn as the player finds them on the keyboard; gone once one is pressed. */
+function MoveKeys({ keys }: { keys: 'wasd' | 'arrows' }) {
+  const [used, setUsed] = useState(false);
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => { if (MOVE_KEYS[keys].keys.includes(e.key.toLowerCase())) setUsed(true); };
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, [keys]);
+  const [up, left, down, right] = MOVE_KEYS[keys].caps;
+  return (
+    <div aria-hidden="true" style={{ ...module(44), height: 'auto', borderRadius: 16, padding: 10, display: 'grid', gridTemplateColumns: 'repeat(3, 22px)', gap: 4, opacity: used ? 0 : 1, transition: 'opacity 600ms cubic-bezier(0.2, 0, 0, 1)' }}>
+      <span /><KeyCap>{up}</KeyCap><span />
+      <KeyCap>{left}</KeyCap><KeyCap>{down}</KeyCap><KeyCap>{right}</KeyCap>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- end card
 /**
  * The end of a run: the score, a best if there is one, up to three short lines, then
@@ -267,6 +348,7 @@ export function Stick({ onMove, size = 132 }: { onMove: (x: number, y: number) =
  */
 export function EndCard({ score, title = 'Score', best, lines = [], onPlayAgain, onShare, children }: { score: number; title?: string; best?: number | null; lines?: string[]; onPlayAgain: () => void; onShare?: () => void; children?: ReactNode }) {
   useHudStyle();
+  const scale = useHudScale();
   const record = best != null && score > best;
   const pill = (primary: boolean): CSSProperties => ({
     height: 52, padding: '0 28px', borderRadius: 26, border: primary ? 0 : `1px solid ${HUD.line}`, background: primary ? HUD.lit : 'transparent',
@@ -274,7 +356,7 @@ export function EndCard({ score, title = 'Score', best, lines = [], onPlayAgain,
   });
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0, 0, 0, 0.78)', fontFamily: HUD.font, color: HUD.ink, pointerEvents: 'auto', padding: 24 }}>
-      <div className="bp-hud-rise" style={{ width: '100%', maxWidth: 320, textAlign: 'center', padding: '28px 24px 24px', borderRadius: 28, background: 'rgba(24, 22, 20, 0.96)', border: `1px solid ${HUD.line}`, animation: 'bp-hud-rise 340ms cubic-bezier(0.2, 0, 0, 1)' }}>
+      <div className="bp-hud-rise" style={{ zoom: scale, width: '100%', maxWidth: 320, textAlign: 'center', padding: '28px 24px 24px', borderRadius: 28, background: 'rgba(24, 22, 20, 0.96)', border: `1px solid ${HUD.line}`, animation: 'bp-hud-rise 340ms cubic-bezier(0.2, 0, 0, 1)' }}>
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1.6, textTransform: 'uppercase', color: record ? HUD.lit : 'rgba(246, 242, 234, 0.6)' }}>{record ? 'New best' : title}</div>
         <div style={{ fontSize: 56, lineHeight: '60px', fontWeight: 700, letterSpacing: -2, fontVariantNumeric: 'tabular-nums', marginTop: 4, color: record ? HUD.lit : HUD.ink }}>{fmt(score)}</div>
         {best != null && !record && <div style={{ fontSize: 14, opacity: 0.6, marginTop: 2 }}>Best {fmt(best)}</div>}
