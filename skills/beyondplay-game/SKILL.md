@@ -70,6 +70,7 @@ Node 20 or newer. The checks on a machine without that browser can point
 
 ```bash
 npm run new-game -- <slug> "Display Name"      # slug: ^[a-z0-9][a-z0-9-]{2,40}$
+npm run new-game -- <slug> "Display Name" --starter runner   # or start from a genre starter (contract section 5d)
 ```
 
 The scaffold copies the template, sets `<title>`, writes

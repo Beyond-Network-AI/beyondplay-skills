@@ -19,6 +19,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it (an edited copy is scanned as the game's own code). |
 | `src/beyondplay-audio.ts` | platform | `loadSound`, `play`, `startMusic`, `setMuted`: sound effects and a music loop (section 5a). Import it; do not edit it. |
 | `src/beyondplay-hud.tsx` | platform | `Hud`, `HudRow`, `Stat`, `Timer`, `Hearts`, `Meter`, `Callout`, `HudButton`, `Stick`, `EndCard`, `setHudTheme`: what shows over the play (section 5b). Import it; do not edit it. |
+| `src/beyondplay-anim.ts` | platform | `loadClips`, `Animator`: clip packs for the shared bull kit and cross-faded animation states (section 5c). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
 | `tsconfig.json`, `vite.config.ts` | platform | Strict TypeScript; shared Vite settings. |
@@ -303,6 +304,48 @@ On a desktop and in full screen (where the platform plays the game on a landscap
 smoke, line, font); call it once before the first render. The file itself is platform-owned: an
 edited copy is `GAME_TEMPLATE_FILE_MODIFIED`. A game that draws its own HUD is noted for the
 reviewer (`GAME_HUD_NOT_KIT`, review tier). Ask the platform for a piece the kit lacks.
+
+## 5c. Character animation
+
+A character that snaps from one pose to the next reads as cheap. Play the shared bull (the COBI kit,
+`src/cobi-kit.ts`) through `src/beyondplay-anim.ts`, which blends every change of state:
+
+```ts
+import { Animator, loadClips } from './beyondplay-anim';
+
+const clips = await loadClips('runner');           // a platform pack, or the address of a .glb of your own
+const anim = new Animator(bull.root, clips, {
+  run:   { clip: 'run' },
+  jump:  { clip: 'run-jump', loop: false },        // holds its last pose until the game says it landed
+  slide: { clip: 'run-slide', loop: false, then: 'run' },
+  hit:   { clip: 'hit-react', loop: false, then: 'run' },
+  down:  { clip: 'knockout', loop: false },
+});
+anim.play('run');
+anim.play('jump');                                 // on the engine's event, in the shell
+anim.setSpeed('run', speed / 8.5); anim.update(dt); // every frame, on the render clock
+```
+
+- Every change of state cross-fades (0.18 s unless the state says otherwise). A one-shot state
+  (`loop: false`) holds its last pose, or moves on to its `then` state by itself.
+- Clips play in place: the engine alone decides where the character is. Animation is look only:
+  it runs on the render clock and the simulation never reads it.
+- Give every character at least: a loop for moving, one for each thing the player does (jump,
+  slide, attack), a reaction to being hit, an end for losing and one for winning.
+- The packs are loaded from the asset host at run time, after the first frame, and are never
+  copied into the game: `runner` (idle-neutral, run, run-jump, run-slide, hit-react, knockout,
+  victory; 479 KB). Draw a stand-in until the character arrives; never hold the first frame for it.
+
+## 5d. Genre starters
+
+`npm run new-game -- <slug> "Name" --starter runner` lays a genre starter over the template: a
+complete game of that genre that passes the ladder as scaffolded, with its engine
+(`src/game.ts`), its scene (`src/scene.ts`), the shell, the check driver, a sound set and a music
+loop from the asset library (credited in `CREDITS.md`), the HUD kit and the animated bull. Start
+from the starter that is nearest your idea and change it; keep its shape.
+
+- `runner`: three lanes, obstacles to dodge, jump or slide under, coins, sixty seconds or three
+  hits. three.js, 15 draw calls, about 28,000 triangles with the bull.
 
 ## 6. The test hook
 

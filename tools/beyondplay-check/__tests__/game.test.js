@@ -117,6 +117,16 @@ describe('beyondplay-check game', () => {
     expect(issue(r, 'GAME_HUD_NOT_KIT')).toMatchObject({ severity: 'warning', tier: 'review', path: 'src/App.tsx' });
   });
 
+  it('the animation helper may not be edited, and a game may ship without it', async () => {
+    append(join(dir, 'src/beyondplay-anim.ts'), 'export const mine = 1;');
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-anim.ts' });
+    rmSync(join(dir, 'src/beyondplay-anim.ts'));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MODIFIED');
+  });
+
   it('a library asset needs its line in CREDITS.md, and the asset host is not an external request', async () => {
     write(join(dir, 'public/assets/library/sfx-core/coin/coin-01.ogg'), Buffer.alloc(64, 1));
     append(join(dir, 'src/App.tsx'), "const kitBase = 'https://assets.beyondplay.xyz/library/v0/music-core/loop/arcade-level-1.ogg';");
