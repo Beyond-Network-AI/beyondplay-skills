@@ -1,16 +1,23 @@
 // Scaffold a new game from the template:
-//   npm run new-game <slug> "Display Name"
-// The result is a complete, playable game (Tap Timing) in games/<slug>/ that
-// builds and passes every check as scaffolded. Replace the engine and the shell
-// with your game; keep their shape.
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+//   npm run new-game <slug> "Display Name" [-- --starter runner]
+// The result is a complete, playable game in games/<slug>/ that builds and
+// passes every check as scaffolded: Tap Timing, or a genre starter laid over
+// the template (starters/<name>/: its engine, scene, shell, check driver,
+// sounds and music). Replace the engine and the shell with your game; keep
+// their shape.
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { KIT_ROOT, SLUG_RE } from './kit.mjs';
 
-const slug = process.argv[2];
-const name = process.argv[3] ?? slug;
-if (!slug || !SLUG_RE.test(slug)) {
-  console.error('usage: npm run new-game <slug> "Display Name"   (slug: lowercase letters, digits and dashes, 3 to 41 characters)');
+const args = process.argv.slice(2);
+const flag = args.indexOf('--starter');
+const starter = flag >= 0 ? args.splice(flag, 2)[1] : null;
+const slug = args[0];
+const name = args[1] ?? slug;
+const STARTERS = join(KIT_ROOT, 'starters');
+const starters = existsSync(STARTERS) ? readdirSync(STARTERS, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name) : [];
+if (!slug || !SLUG_RE.test(slug) || (flag >= 0 && !starters.includes(starter))) {
+  console.error(`usage: npm run new-game <slug> "Display Name" [-- --starter ${starters.join('|') || '<name>'}]   (slug: lowercase letters, digits and dashes, 3 to 41 characters)`);
   process.exit(2);
 }
 const dest = join(KIT_ROOT, 'games', slug);
@@ -19,7 +26,12 @@ if (existsSync(dest)) {
   process.exit(2);
 }
 
-cpSync(join(KIT_ROOT, 'template'), dest, { recursive: true });
+// The template's own build output (if someone built it in place) is never part of a new game.
+cpSync(join(KIT_ROOT, 'template'), dest, { recursive: true, filter: (src) => src !== join(KIT_ROOT, 'template', 'dist') });
+// A genre starter replaces the starter files and adds its own (scene, sounds, music).
+const CREDIT_LINES = 'CREDITS.library.md';
+if (starter) cpSync(join(STARTERS, starter), dest, { recursive: true, filter: (src) => !src.endsWith(CREDIT_LINES) });
+const libraryCredits = starter && existsSync(join(STARTERS, starter, CREDIT_LINES)) ? readFileSync(join(STARTERS, starter, CREDIT_LINES), 'utf8').trim() : '';
 
 const idx = join(dest, 'index.html');
 writeFileSync(idx, readFileSync(idx, 'utf8').replace('<title>BeyondPlay</title>', `<title>${name}</title>`));
@@ -44,8 +56,8 @@ work, public domain (CC0), or a licence that permits commercial games.
 
 | Asset | Author | Source | Licence |
 |---|---|---|---|
-| (none yet: the scaffold draws everything in code and makes no sound) | | | |
-`);
+| (none yet: the scaffold draws everything in code${libraryCredits ? '; its sounds, music and character are from the asset library, below' : ' and makes no sound'}) | | | |
+${libraryCredits ? `\n## Library assets\n\n${libraryCredits}\n` : ''}`);
 
 // Art sources: a 512 x 512 icon (required to publish) and a 1920 x 1080 banner
 // (optional). Draw on the canvas, then render with npm run render-icon / render-banner.
