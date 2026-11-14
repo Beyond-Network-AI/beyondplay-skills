@@ -31,6 +31,9 @@
 //                    private to that player, null when signed out. Use src/beyondplay-save.ts
 //                    (loadSave, writeSave), which also keeps a copy on the device; declare it:
 //                    uses: ['player.save']
+//   player.avatar    the player's avatar in one declared kit: { kit, id, look, source, model }, the
+//                    same look in every game (the player chooses it in the app), answered signed
+//                    out too with the platform's pick; declare the kit: uses: ['player.avatar:ape']
 //
 // Phase 4:
 //   store            the game's own items for B-Bucks (cosmetics only): what is on sale, what this
@@ -43,7 +46,7 @@
 // the end card; nothing the simulation reads comes from an item or a trait.
 // Read items in src/App.tsx, never in src/game.ts.
 
-export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share' | 'player.items' | 'player.stats' | 'player.friends' | 'player.save' | 'store';
+export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share' | 'player.items' | 'player.stats' | 'player.friends' | 'player.save' | 'player.avatar' | 'store';
 
 export interface HostInfo {
   surface: 'feed' | 'page' | 'app' | 'telegram' | 'desktop' | 'unknown';
@@ -179,6 +182,32 @@ export interface StoreBuyResult {
   outcome: 'bought' | 'owned';
 }
 
+export interface PlayerAvatarParams {
+  /** The kit, the one declared in uses as 'player.avatar:<kit>' ('ape'). */
+  kit: string;
+}
+
+/** The player's avatar: one look, the same in every game. Look only: never how a run plays. */
+export interface PlayerAvatar {
+  kit: string;
+  /** The library character to show ('ape-07'); src/beyondplay-characters.ts loadCharacter(id) loads it with its moves. */
+  id: string;
+  look: { preset: string };
+  /** own: the player chose it; default: the platform picked it for this player or device. */
+  source: 'own' | 'default';
+  /** One baked file on the asset host, or null when the catalogue does not hold it yet (load the library character by id). */
+  model: {
+    kind: 'baked';
+    url: string;
+    skeleton: string | null;
+    height: number | null;
+    facing: string | null;
+    feetAt: number | null;
+    /** The library move set it plays. */
+    moves: string | null;
+  } | null;
+}
+
 export interface CapabilityParams {
   capabilities: undefined;
   host: undefined;
@@ -188,6 +217,7 @@ export interface CapabilityParams {
   'player.stats': undefined;
   'player.friends': undefined;
   'player.save': PlayerSaveParams;
+  'player.avatar': PlayerAvatarParams;
   store: StoreParams;
 }
 
@@ -202,6 +232,8 @@ export interface CapabilityResults {
   'player.friends': PlayerFriend[] | null;
   /** A PlayerSave for a read, a PlayerSaveWrite for a write, null when signed out. */
   'player.save': PlayerSave | PlayerSaveWrite | null;
+  /** The player's avatar in the declared kit; never null from a host that offers it (signed out: the platform's pick). */
+  'player.avatar': PlayerAvatar;
   /** StoreItem[] for items; a StoreBuyResult for a buy (it rejects with cancelled when the player closes the sheet), or { outcome: 'pending' } to a buy with `wait` while the sheet is open. */
   store: StoreItem[] | StoreBuyResult | { outcome: 'pending' };
 }
