@@ -637,6 +637,7 @@ does not list.
 | `player.stats` | open | | `{ best, plays, lastPlayedAt }` for this game, or `null` when signed out; what the leaderboard already shows. |
 | `player.friends` | open | | `[{ displayName, avatar, best }]` for friends who played this game, or `null` when signed out. No ids, no items, no lookup by player. |
 | `player.save` | open | `{ op: 'get' }` or `{ op: 'set', data }` | `{ data, updatedAt }` for a read, `{ ok, updatedAt }` for a write, or `null` when signed out. One JSON value per player per game, at most 16 KB, private to that player. Use `src/beyondplay-save.ts` (section 5e). |
+| `player.avatar` | open | `{ kit }` | `{ kit, id, look, source, model }`: the player's avatar in the kit declared as `player.avatar:<kit>` (`uses: ['player.avatar:ape']`), the same look in every game, answered signed out too with the platform's pick. `id` is the library character (`ape-07`): load it with `loadCharacter(id)` from `src/beyondplay-characters.ts`, or `model.url`. Look only. |
 | `store` | open | `{ op: 'items' }` or `{ op: 'buy', item, wait? }` | For `items`: `[{ id, name, blurb, image, price, onSale, owned }]`, the items declared with `defineStore`. For `buy`: `{ outcome: 'bought' \| 'owned' }` once the player owns the item; rejects with `cancelled` when the player closes the platform's sheet. Use `src/beyondplay-store.ts` (section 5f). |
 
 Tiers: `open` is answered without asking the player, which covers

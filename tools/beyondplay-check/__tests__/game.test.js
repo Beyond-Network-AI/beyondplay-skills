@@ -397,6 +397,20 @@ describe('beyondplay-check game', () => {
     expect(issue(none, 'GAME_CAPABILITY_UNDECLARED').message).toContain("declare the collection: uses: ['player.items:cobi']");
   });
 
+  const AVATAR_REQUEST = "const me = await request('player.avatar', { kit: 'ape' }).catch(() => null);";
+
+  it('a declared kit satisfies request(\'player.avatar\'); a bare player.avatar declares none', async () => {
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share', 'player.avatar:ape']"));
+    append(join(dir, 'src/App.tsx'), AVATAR_REQUEST);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNKNOWN');
+    expect(r.facts.uses).toEqual(['player.avatar:ape', 'share']);
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share', 'player.avatar']"));
+    const bare = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(bare, 'GAME_CAPABILITY_UNDECLARED').message).toContain("declare the kit: uses: ['player.avatar:ape']");
+  });
+
   it('a collection slug is checked for shape only; a colon on another capability is unknown', async () => {
     writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share', 'player.items:Not A Slug', 'player.profile:cobi']"));
     append(join(dir, 'src/App.tsx'), ITEMS_REQUEST);
