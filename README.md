@@ -94,6 +94,8 @@ plays. `docs/player-items.md` is the recipe.
 
 ## Maintenance
 
+`npm run sync-characters -- <path to a beyondplay-games checkout>` does the same for the characters-and-moves loader (`library/characters/characters.ts` there) into `template/src/beyondplay-characters.ts`, recorded in `template/src/beyondplay-characters.SOURCE.json`; `--check` confirms it.
+
 `npm run sync-cobi-kit -- <path to a beyondplay-games checkout>` brings the COBI loader (`library/characters/cobi.ts` there, the one copy) into `template/src/cobi-kit.ts` under a sync header and records its commit and SHA-256 in `template/src/cobi-kit.SOURCE.json`; `npm run sync-cobi-kit -- --check` confirms the copy still matches the record.
 
 ## Access

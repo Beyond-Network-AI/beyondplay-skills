@@ -81,12 +81,12 @@ const tools = {
     run({ path }) { return clip(readFileSync(safePath(path), 'utf8'), 60000); },
   },
   write_file: {
-    description: 'Write a text file inside games/<slug>/. Creates folders as needed. Never write the platform-owned files (index.html except <title>, src/main.tsx, src/beyondplay-kit.ts, src/cobi-kit.ts).',
+    description: 'Write a text file inside games/<slug>/. Creates folders as needed. Never write the platform-owned files (index.html except <title>, src/main.tsx, src/beyondplay-kit.ts, src/cobi-kit.ts, src/beyondplay-characters.ts).',
     parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] },
     run({ path, content }) {
       const abs = safePath(path, { write: true });
       const rel = relative(KIT_ROOT, abs).split(/[\\/]/).slice(2).join('/');
-      if (['src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts'].includes(rel)) throw new Error(`${rel} is platform-owned; do not write it`);
+      if (['src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts', 'src/beyondplay-characters.ts'].includes(rel)) throw new Error(`${rel} is platform-owned; do not write it`);
       mkdirSync(dirname(abs), { recursive: true });
       writeFileSync(abs, content);
       return `wrote ${relative(KIT_ROOT, abs)} (${Buffer.byteLength(content)} bytes)`;

@@ -19,7 +19,9 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it (an edited copy is scanned as the game's own code). |
 | `src/beyondplay-audio.ts` | platform | `loadSound`, `play`, `startMusic`, `setMuted`: sound effects and a music loop (section 5a). Import it; do not edit it. |
 | `src/beyondplay-hud.tsx` | platform | `Hud`, `HudRow`, `Stat`, `Timer`, `Hearts`, `Meter`, `Callout`, `HudButton`, `Stick`, `EndCard`, `setHudTheme`: what shows over the play (section 5b). Import it; do not edit it. |
+| `src/cobi-kit.ts` | platform | `CobiKit`: builds the shared bull from the kit on the asset host (section 9). Import it; do not edit it. |
 | `src/beyondplay-anim.ts` | platform | `loadClips`, `Animator`: clip packs for the shared bull kit and cross-faded animation states (section 5c). Import it; do not edit it. |
+| `src/beyondplay-characters.ts` | platform | `loadCharacter`, `loadClip`, `clipsFor`, `loadDance`: the library's rigged characters and their moves, from the asset host (section 5c). Import it; do not edit it. |
 | `src/beyondplay-save.ts` | platform | `loadSave`, `writeSave`, `flushSave`: progress that follows the player (section 5e). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
@@ -238,11 +240,14 @@ A game should have sound: a small set of effects (tap, hit, pickup, win, lose) a
 Take them from the platform's asset library before making your own:
 
 - On the creator MCP, `search_assets` finds ready, licensed parts (sound effects, music loops by
-  mood, sprites, tiles, UI pieces, the bull kit) and `add_asset` gives, for one result, the file's
-  address, where it goes in the game (`public/assets/library/<pack>/...`), how to use it and the
-  exact line for `CREDITS.md`. Search first; draw, generate or record only when nothing fits.
-- Small files (art, sound, music) are copied into the game. 3D kits are loaded from
-  `assets.beyondplay.xyz` at run time and never copied, so the game stays inside the weight limits.
+  mood, sprites, tiles, UI pieces, the bull kit, rigged characters and their moves) and `add_asset`
+  gives, for one result, the file's address, where it goes in the game
+  (`public/assets/library/<pack>/...`), how to use it and the exact line for `CREDITS.md`. Search
+  first; draw, generate or record only when nothing fits.
+- Small files (art, sound, music) are copied into the game. 3D (the bull kit, the characters and
+  their moves) is loaded from `assets.beyondplay.xyz` at run time and never copied, so the game stays
+  inside the weight limits: `add_asset` answers with the address, a loader snippet and, for a move,
+  the characters it plays on.
 - Every file under `public/assets/library/` needs its line in `CREDITS.md`, tagged
   `[library: <id>]` (`GAME_LIBRARY_CREDIT_MISSING`, listing tier). Assets that are not from the
   library keep the existing rule: owned, CC0 or commercially licensed, and named in `CREDITS.md`.
@@ -352,6 +357,38 @@ anim.setSpeed('run', speed / 8.5); anim.update(dt); // every frame, on the rende
 - The packs are loaded from the asset host at run time, after the first frame, and are never
   copied into the game: `runner` (idle-neutral, run, run-jump, run-slide, hit-react, knockout,
   victory; 479 KB). Draw a stand-in until the character arrives; never hold the first frame for it.
+
+### Characters and moves from the library
+
+The library holds rigged characters and a set of moves for each, on the asset host; search it first
+(`search_assets` with `kind: "character"` or `kind: "animation"`, and `playsOn` for one character's
+moves). `src/beyondplay-characters.ts` loads them, and the `Animator` above plays them:
+
+```ts
+import { clipsFor, loadCharacter } from './beyondplay-characters';
+import { Animator } from './beyondplay-anim';
+
+const ape = await loadCharacter('ape');            // 1.75 m, feet at y = 0, faces +Z
+scene.add(ape.root);
+const clips = await clipsFor(ape, ['idle', 'walk', 'sit', 'wave', 'fall', 'dance-ymca']);
+const anim = new Animator(ape.root, clips, {
+  idle: { clip: 'idle' },
+  walk: { clip: 'walk' },
+  wave: { clip: 'wave', loop: false, then: 'idle' },
+});
+// the kit bull plays the bull's moves the same way:
+const bullClips = await clipsFor({ id: 'bull', root: bull.root }, ['idle', 'sit', 'wave']);
+```
+
+- Characters: `ape`, `beyonder-pink`, `beyonder-green`, and `bull` (its body is the kit, `src/cobi-kit.ts`).
+- Moves, the same names for every character: idle, walk, run, jump, sit, sit-down, stand-up, fall,
+  land, glide, wave, point, clap, cheer. Each character has its own file for each; a move plays on the
+  character it was made for. Dances that play on any of them: backflip, victory, dance-hiphop,
+  dance-samba, dance-slide, dance-ymca.
+- Moves play in place. The two sit transitions travel: the distance is in the move's record
+  (`meta.travel`), so the game can move the character with it.
+- The loader finds the files through the library's index, so a character or move added to the library
+  is there for every game with no change to the template.
 
 ## 5d. Genre starters
 
