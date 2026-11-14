@@ -138,6 +138,28 @@ describe('beyondplay-check game', () => {
     expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MODIFIED');
   });
 
+  it('the characters helper may not be edited, and a game may ship without it', async () => {
+    append(join(dir, 'src/beyondplay-characters.ts'), 'export const mine = 1;');
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-characters.ts' });
+    rmSync(join(dir, 'src/beyondplay-characters.ts'));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MODIFIED');
+  });
+
+  it('the library\'s characters and moves load from the asset host, which is not an external request', async () => {
+    append(join(dir, 'src/App.tsx'), [
+      "const index = 'https://assets.beyondplay.xyz/library/manifests/index.json';",
+      "const ape = 'https://assets.beyondplay.xyz/library/v0/bullieverse-3d/character/ape.1a2b3c4d.glb';",
+      "const wave = 'https://assets.beyondplay.xyz/library/v0/bullieverse-moves/moves/ape/wave.3f9a1c2e.glb';",
+      "fetch(index); fetch(ape); fetch(wave);",
+    ].join('\n'));
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_EXTERNAL_REQUEST');
+    expect(codes(r)).not.toContain('GAME_EXTERNAL_URL');
+  });
+
   it('a library asset needs its line in CREDITS.md, and the asset host is not an external request', async () => {
     write(join(dir, 'public/assets/library/sfx-core/coin/coin-01.ogg'), Buffer.alloc(64, 1));
     append(join(dir, 'src/App.tsx'), "const kitBase = 'https://assets.beyondplay.xyz/library/v0/music-core/loop/arcade-level-1.ogg';");

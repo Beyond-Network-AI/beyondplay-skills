@@ -25,6 +25,7 @@
     "pack": "node scripts/pack.mjs",
     "typecheck": "node scripts/typecheck.mjs",
     "sync-cobi-kit": "node scripts/sync-cobi-kit.mjs",
+    "sync-characters": "node scripts/sync-characters.mjs",
     "test": "vitest run --root tools/beyondplay-check",
     "browser": "playwright install chromium",
     "agent": "node scripts/agent.mjs",

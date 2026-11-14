@@ -41,8 +41,8 @@ server; each asks you to sign in the first time.
 | `request_icon_upload_url`, `set_icon` | The 512 x 512 icon (and the 1920 x 1080 banner). |
 | `publish_unlisted` | Publish a passed build at `https://<slug>.beyondplay.xyz`, absent from the feed. |
 | `reset_leaderboard` | Wipe a published game's scores, every board or one, for a fresh start after a balance change. Cannot be undone. |
-| `search_assets` | Search the asset library for ready, licensed parts: sprites, tiles, UI pieces, sound effects, music loops, effects and 3D character kits. Search here before drawing, generating or leaving a game silent. |
-| `add_asset` | For one search result: the file's address, where it goes in the game (`public/assets/library/...`), how to use it and the exact `CREDITS.md` line. Small files are copied; 3D kits are loaded from the asset host. |
+| `search_assets` | Search the asset library for ready, licensed parts: sprites, tiles, UI pieces, sound effects, music loops, effects, 3D character kits, rigged characters and their moves. Search here before drawing, generating or leaving a game silent. |
+| `add_asset` | For one search result: the file's address, where it goes in the game (`public/assets/library/...`), how to use it and the exact `CREDITS.md` line. Small files are copied; 3D (kits, characters, moves) is loaded from the asset host, never copied: the answer has a loader snippet and the characters a move plays on. |
 | `submit_for_review`, `withdraw_submission`, `get_review_status` | The review gate. Submitting runs one more hosted build over the live archive; a reviewer approves once it passes, and approval lists the game. |
 
 The archive: `npm run pack -- games/<slug>` writes `out/<slug>.tar.gz` with `src/`,

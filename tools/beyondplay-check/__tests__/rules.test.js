@@ -116,7 +116,7 @@ describe('checkConcept', () => {
     const r = checkConcept({ description: 'Load the bull model from a CDN.' });
     const cdn = r.verdicts.find((v) => v.feature === 'cdn_assets');
     expect(cdn).toMatchObject({ allowed: false, code: 'GAME_EXTERNAL_REQUEST' });
-    expect(cdn.verdict).toContain('assets the platform serves from assets.beyondplay.xyz (the bull kit) are fine');
+    expect(cdn.verdict).toContain("assets the platform serves from assets.beyondplay.xyz (the bull kit, the library's characters and moves) are fine");
     expect(r.blocking).toContain('cdn_assets');
   });
 });

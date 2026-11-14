@@ -21,9 +21,9 @@ import { fileURLToPath } from 'node:url';
 import { sha256, walk } from './files.js';
 import { DOCS } from './limits.js';
 
-export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts', 'src/beyondplay-audio.ts', 'src/beyondplay-hud.tsx', 'src/beyondplay-anim.ts', 'src/beyondplay-save.ts', 'src/beyondplay-store.ts'];
+export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts', 'src/beyondplay-audio.ts', 'src/beyondplay-hud.tsx', 'src/beyondplay-anim.ts', 'src/beyondplay-characters.ts', 'src/beyondplay-save.ts', 'src/beyondplay-store.ts'];
 /** Contract files a game may ship without: added after the first games were scaffolded, so absence is drift, not an error. */
-export const OPTIONAL_CONTRACT_FILES = new Set(['src/cobi-kit.ts', 'src/beyondplay-audio.ts', 'src/beyondplay-hud.tsx', 'src/beyondplay-anim.ts', 'src/beyondplay-save.ts', 'src/beyondplay-store.ts']);
+export const OPTIONAL_CONTRACT_FILES = new Set(['src/cobi-kit.ts', 'src/beyondplay-audio.ts', 'src/beyondplay-hud.tsx', 'src/beyondplay-anim.ts', 'src/beyondplay-characters.ts', 'src/beyondplay-save.ts', 'src/beyondplay-store.ts']);
 /** Starter files the template ships for the game to replace; never compared. */
 export const STARTER_FILES = new Set(['src/App.tsx', 'src/game.ts', 'src/beyondplay.config.ts', 'smoke.driver.mjs']);
 
