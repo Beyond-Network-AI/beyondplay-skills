@@ -284,6 +284,15 @@ export function onCapabilities(cb: (names: string[]) => void): () => void {
   return api.onCapabilities(cb) as () => void;
 }
 
+/** Called with the player's new look when it changes while the game runs (they saved another avatar in the locker
+ *  and came back): `avatar` is a fresh player.avatar answer, `params` what the game asked with. Older hosts never
+ *  call it. Returns an unsubscribe function. */
+export function onAvatarChange(cb: (avatar: PlayerAvatar | null, params: PlayerAvatarParams) => void): () => void {
+  const api = bridge();
+  if (!api || typeof api.onAvatarChange !== 'function') return () => {};
+  return api.onAvatarChange(cb) as () => void;
+}
+
 /** True when the error is a CapabilityError with the given code. */
 export function isCapabilityError(err: unknown, code?: CapabilityErrorCode): err is CapabilityError {
   const e = err as CapabilityError | null;
