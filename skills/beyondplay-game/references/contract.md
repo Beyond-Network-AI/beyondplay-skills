@@ -22,6 +22,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/cobi-kit.ts` | platform | `CobiKit`: builds the shared bull from the kit on the asset host (section 9). Import it; do not edit it. |
 | `src/beyondplay-anim.ts` | platform | `loadClips`, `Animator`: clip packs for the shared bull kit and cross-faded animation states (section 5c). Import it; do not edit it. |
 | `src/beyondplay-characters.ts` | platform | `loadCharacter`, `loadClip`, `clipsFor`, `loadDance`: the library's rigged characters and their moves, from the asset host (section 5c). Import it; do not edit it. |
+| `src/beyondplay-avatar.ts` | platform | `loadPlayerAvatar`, `onPlayerAvatarChange`, `loadAvatar`, `DEFAULT_AVATAR`: the player's avatar in any kit the game declared, loaded with its moves (section 5c). Import it; do not edit it. |
 | `src/beyondplay-save.ts` | platform | `loadSave`, `writeSave`, `flushSave`: progress that follows the player (section 5e). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
@@ -376,6 +377,9 @@ const anim = new Animator(ape.root, clips, {
   walk: { clip: 'walk' },
   wave: { clip: 'wave', loop: false, then: 'idle' },
 });
+// the player's own avatar, in any kit the game declared (uses: ['player.avatar:beyonder', 'player.avatar:bull', ...]):
+//   const me = await loadPlayerAvatar();  scene.add(me.character.root);  const myClips = await me.clips(['idle', 'walk']);
+//   onPlayerAvatarChange((next) => { /* swap me for next */ });   // src/beyondplay-avatar.ts
 // the kit bull plays the bull's moves the same way:
 const bullClips = await clipsFor({ id: 'bull', root: bull.root }, ['idle', 'sit', 'wave']);
 ```

@@ -86,7 +86,7 @@ const tools = {
     run({ path, content }) {
       const abs = safePath(path, { write: true });
       const rel = relative(KIT_ROOT, abs).split(/[\\/]/).slice(2).join('/');
-      if (['src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts', 'src/beyondplay-characters.ts'].includes(rel)) throw new Error(`${rel} is platform-owned; do not write it`);
+      if (['src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts', 'src/beyondplay-characters.ts', 'src/beyondplay-avatar.ts'].includes(rel)) throw new Error(`${rel} is platform-owned; do not write it`);
       mkdirSync(dirname(abs), { recursive: true });
       writeFileSync(abs, content);
       return `wrote ${relative(KIT_ROOT, abs)} (${Buffer.byteLength(content)} bytes)`;
