@@ -146,7 +146,9 @@
       }
     }
     window.addEventListener('message', function (event) {
-      if (framed && event.source !== window.parent) return;
+      // Framed: the host page only. Not framed: the app's own events (dispatched in the page, no source window), never
+      // a message from another window (an opener) posing as the host.
+      if (framed ? event.source !== window.parent : (event.source && event.source !== window)) return;
       dispatch(event.data);
     });
     var extras = {
