@@ -39,14 +39,15 @@ Games live or die on phones. Every rule below has broken a shipped game once.
 - The template CSS disables text selection, tap highlights and zoom. Do not
   undo it.
 - Text at phone size: minimum 12 px; the score is readable at arm's length.
-- Portrait first; a large screen is an addition. A game may declare how it is
-  shown and played there in `src/beyondplay.config.ts`:
-  `export const display = defineDisplay({ orientation, input, keys })`. The
-  defaults (`portrait`, `['touch', 'mouse']`, no keys) fit a one-thumb phone
-  game, so most games declare nothing. The manifest always carries `display`
-  and the hosts read it to lay the game out (`docs/display.md`). The hosted
-  build accepts it once `get_contract`'s Display section no longer says
-  "Not yet".
+- Portrait first on a phone, and every game plays on a desktop too. Declare
+  how it is shown and played there in `src/beyondplay.config.ts`:
+  `export const display = defineDisplay({ orientation, input, keys })`, with
+  `'keyboard'` and the keys that play it. A game that declares nothing is
+  phone-only (`portrait`, `['touch', 'mouse']`, no keys): it publishes
+  unlisted but is not listed (`DISPLAY_PHONE_ONLY`). The manifest always
+  carries `display` and the hosts read it to lay the game out
+  (`docs/display.md`): a portrait game shows in a phone-shaped box on a
+  desktop, an `any` game on a wide stage.
 - `portrait` when the logical space is portrait. `any` only when the view
   adapts (camera or field of view per aspect, HUD per aspect) and the render
   smoke passes at 1280 x 720 as well as 390 x 844. `landscape` only when the

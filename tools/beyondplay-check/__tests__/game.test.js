@@ -14,9 +14,19 @@ const append = (abs, text) => writeFileSync(abs, readFileSync(abs, 'utf8') + '\n
 function declareDisplay(dir, decl) {
   const cfg = join(dir, 'src/beyondplay.config.ts');
   const before = readFileSync(cfg, 'utf8');
-  const src = before.replace("import { defineChallenge, defineSoloGame } from './beyondplay-kit';", "import { defineChallenge, defineDisplay, defineSoloGame } from './beyondplay-kit';");
-  if (src === before) throw new Error('the copied config no longer has the import this test rewrites');
+  // The template declares its own display (phone and desktop); a test's declaration replaces it.
+  const src = before.replace(/export const display = defineDisplay\(\{[\s\S]*?\n\}\);\n/, '');
+  if (src === before) throw new Error('the copied config no longer has the display declaration this test replaces');
   writeFileSync(cfg, `${src}\nexport const display = defineDisplay(${decl});\n`);
+}
+
+/** Drop the starter's own key binding (src/App.tsx binds Space and Enter to tap), for tests about handlers. */
+function withoutStarterKeys(dir) {
+  const app = join(dir, 'src/App.tsx');
+  const before = readFileSync(app, 'utf8');
+  const after = before.replace(/^.*bindKeys\(display\.keys.*\n/m, '').replace(/^.*unbindKeys\(\);\n/m, '');
+  if (after === before) throw new Error('the copied App.tsx no longer binds keys the way this test expects');
+  writeFileSync(app, after);
 }
 
 /** A minimal built dist/ (index.html with the shell markers) carrying the given manifest. */
@@ -478,13 +488,27 @@ describe('beyondplay-check game: the display declaration', () => {
 
   const displayCodes = (r) => codes(r).filter((c) => c.startsWith('DISPLAY_'));
 
-  it('the template declares nothing: its manifest carries the default display before uses, and the report records it', async () => {
+  it('the template plays on a phone and on a desktop: Space or Enter taps, carried before uses, and the report records it', async () => {
+    const want = { orientation: 'portrait', input: ['touch', 'mouse', 'keyboard'], keys: { tap: 'space|enter' } };
     const manifest = await checkConfig(dir, createReport({ kind: 'game', dir }));
-    expect(manifest.display).toEqual(DEFAULT_DISPLAY);
+    expect(manifest.display).toEqual(want);
     expect(Object.keys(manifest)).toEqual(['playerMode', 'challenge', 'defaultUnitId', 'display', 'uses']);
     const r = await checkGame(dir, { template: TEMPLATE });
     expect(r.ok).toBe(true);
+    // The starter binds its keys (bindKeys in src/App.tsx), so no display finding at all.
     expect(displayCodes(r)).toEqual([]);
+    expect(r.facts.display).toEqual(want);
+  });
+
+  it('a game that declares nothing gets the default display and DISPLAY_PHONE_ONLY: it publishes, unlisted', async () => {
+    const cfg = join(dir, 'src/beyondplay.config.ts');
+    writeFileSync(cfg, readFileSync(cfg, 'utf8').replace(/export const display = defineDisplay\(\{[\s\S]*?\n\}\);\n/, ''));
+    const manifest = await checkConfig(dir, createReport({ kind: 'game', dir }));
+    expect(manifest.display).toEqual(DEFAULT_DISPLAY);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(displayCodes(r)).toContain('DISPLAY_PHONE_ONLY');
+    expect(r.issues.find((i) => i.code === 'DISPLAY_PHONE_ONLY')).toMatchObject({ severity: 'warning', tier: 'listing' });
     expect(r.facts.display).toEqual(DEFAULT_DISPLAY);
   });
 
@@ -541,6 +565,7 @@ describe('beyondplay-check game: the display declaration', () => {
 
   it('warns when keyboard is declared but no handler binds keys (src/keys.ts alone does not count)', async () => {
     declareDisplay(dir, "{ input: ['touch', 'mouse', 'keyboard'], keys: { jump: 'space' } }");
+    withoutStarterKeys(dir);
     copyFileSync(join(TEMPLATE, 'src/keys.ts'), join(dir, 'src/keys.ts'));
     let r = await checkGame(dir, { template: TEMPLATE });
     expect(issue(r, 'DISPLAY_KEYBOARD_NO_HANDLER')).toMatchObject({ severity: 'warning', tier: 'review', path: 'src/beyondplay.config.ts' });
@@ -557,6 +582,8 @@ describe('beyondplay-check game: the display declaration', () => {
   });
 
   it('notes a key handler when keyboard is not declared, at its file and line', async () => {
+    declareDisplay(dir, '{}');
+    withoutStarterKeys(dir);
     const app = join(dir, 'src/App.tsx');
     append(app, "window.addEventListener('keydown', (e) => { if (e.key === ' ') console.log('jump'); });");
     const line = readFileSync(app, 'utf8').split('\n').findIndex((l) => l.includes("addEventListener('keydown'")) + 1;
@@ -568,7 +595,7 @@ describe('beyondplay-check game: the display declaration', () => {
   it('reports a built manifest without display as a mismatch with the config', async () => {
     const manifest = await checkConfig(dir, createReport({}));
     const { display, ...withoutDisplay } = manifest;
-    expect(display).toEqual(DEFAULT_DISPLAY);
+    expect(display).toEqual({ orientation: 'portrait', input: ['touch', 'mouse', 'keyboard'], keys: { tap: 'space|enter' } });
     writeDist(dir, withoutDisplay);
     let r = await checkGame(dir, { template: TEMPLATE });
     expect(issue(r, 'GAME_BUNDLE_MANIFEST_MISMATCH')).toMatchObject({ severity: 'error', path: 'dist/beyondplay.json' });

@@ -128,6 +128,7 @@ describe('the display rules', () => {
     DISPLAY_KEYS_INVALID: 'publish',
     DISPLAY_KEYS_WITHOUT_KEYBOARD: 'publish',
     DISPLAY_INPUT_NO_POINTER: 'listing',
+    DISPLAY_PHONE_ONLY: 'listing',
     DISPLAY_ORIENTATION_LANDSCAPE: 'review',
     DISPLAY_KEYBOARD_NO_KEYS: 'review',
     DISPLAY_KEYBOARD_NO_HANDLER: 'review',
@@ -148,6 +149,7 @@ describe('the display rules', () => {
     const v = r.verdicts.find((x) => x.feature === 'desktop');
     expect(v).toMatchObject({ allowed: 'conditional', code: 'DISPLAY_INPUT_NO_POINTER', tier: 'listing' });
     expect(v.verdict).toContain('one thumb in portrait');
+    expect(v.verdict).toContain('DISPLAY_PHONE_ONLY');
     expect(v.instead).toContain('defineDisplay(');
     expect(r.blocking).toEqual([]);
     for (const text of ['WASD controls', 'use the arrow keys', 'a landscape racer', 'widescreen view']) {

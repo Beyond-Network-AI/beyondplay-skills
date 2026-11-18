@@ -165,10 +165,11 @@ export function defineSoloGame(opts?: { challenge?: ChallengeHandle | null; lowe
 }
 
 // ── Display: how the game wants to be shown and played on a big screen ───────────────────────────
-// Portrait first: the defaults (portrait, ['touch', 'mouse']) fit every one-thumb phone game, so a game
-// that declares nothing keeps them. The manifest carries the result as `display`; the platform's hosts
-// read it (the stage shape on a large screen, the input chips, the key hint). Records only; nothing
-// touches window.
+// Portrait first on a phone, and every listed game plays on a desktop too: 'keyboard' in input with the
+// keys that play it (the validator's DISPLAY_PHONE_ONLY otherwise; a phone-only game publishes unlisted).
+// The defaults (portrait, ['touch', 'mouse']) are that phone-only game. The manifest carries the result
+// as `display`; the platform's hosts read it (the stage shape on a large screen, the input chips, the
+// key hint). Records only; nothing touches window.
 
 /** 'portrait' (default): a phone game. 'any': the view adapts to a wide screen too (one simulation, a
  *  view per orientation). 'landscape': cannot play in portrait (the phone feed letterboxes it). */

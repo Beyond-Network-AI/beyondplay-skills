@@ -1,9 +1,15 @@
 # Display: how a game is shown and played on a large screen
 
-A game can say how it wants to be laid out on a screen wider than a phone and
-whether keys play it. It declares it once, in the config; the platform's hosts
-read it and decide the rest. Most games declare nothing: a one-thumb portrait
-game is already right everywhere.
+A game says how it wants to be laid out on a screen wider than a phone and
+which keys play it. It declares it once, in the config; the platform's hosts
+read it and decide the rest.
+
+**Every listed game plays on a phone and on a desktop.** On a phone, one thumb
+in portrait; on a desktop, keys that really play it, and a wide view when the
+game adapts. A game that does not declare `'keyboard'` with its keys is
+phone-only: it publishes unlisted, and it is not listed (`DISPLAY_PHONE_ONLY`,
+listing tier; the reviewer cannot approve it). Build both from the start; the
+template already declares Space or Enter to tap.
 
 ## 1. What it is
 
@@ -44,8 +50,9 @@ The manifest then carries, after `defaultUnitId` and before `uses`:
 ```
 
 A game that declares nothing gets `DEFAULT_DISPLAY`,
-`{ "orientation": "portrait", "input": ["touch", "mouse"], "keys": {} }`, and
-so does the emitter's fallback manifest. `defineDisplay` returns the
+`{ "orientation": "portrait", "input": ["touch", "mouse"], "keys": {} }`, a
+phone-only game that is not listed, and so does the emitter's fallback
+manifest. `defineDisplay` returns the
 declaration with the defaults filled (`GameDisplay`), for the shell:
 `import { display } from './beyondplay.config'`, then
 `bindKeys(display.keys, ...)` (section 6). It touches nothing at import time.
@@ -61,7 +68,8 @@ Before you declare it, read section 9: the hosted build has to accept it.
 ## 3. The defaults and the `any` rule
 
 - `portrait` when the logical space is portrait: letterboxed or painted out on
-  a wide screen. Most games, and every game that declares nothing.
+  a wide screen, and shown in a phone-shaped box on a desktop. With keys it
+  plays on a desktop as it is.
 - `any` only when the view adapts: a camera or field of view per aspect, a HUD
   laid out per aspect. Prove it: the render smoke passes at 1280 x 720 as well
   as 390 x 844, and a screenshot at 1280 x 720 reads as a wide view laid out on
@@ -77,8 +85,9 @@ world. Fill every aspect between 9:19.5 and 21:9 edge to edge, painted to the
 edges; letterbox beyond that. Anchor the HUD to the edges with
 `env(safe-area-inset-*)`.
 
-Keys are an addition, never a replacement: pointer events stay the input on
-every device, and the game stays playable with one thumb in portrait.
+Keys are required for listing, and still never a replacement: pointer events
+stay the input on every device, and the game stays playable with one thumb in
+portrait.
 
 ## 4. Key specs (normative)
 
@@ -228,6 +237,7 @@ config produces; the report records the normalized display as
 | `DISPLAY_KEYS_INVALID` | error | publish | `keys` is not an object, or has a bad verb, a bad or reserved spec, more than 8 verbs, or a key in two verbs |
 | `DISPLAY_KEYS_WITHOUT_KEYBOARD` | error | publish | keys declared, `keyboard` not in `input` |
 | `DISPLAY_INPUT_NO_POINTER` | error | listing | `input` lacks `touch` or `mouse` |
+| `DISPLAY_PHONE_ONLY` | warning | listing | `keyboard` not in `input`, or no `keys`: the game plays on a phone only, so it is not listed |
 | `DISPLAY_ORIENTATION_LANDSCAPE` | warning | review | orientation `landscape` |
 | `DISPLAY_KEYBOARD_NO_KEYS` | warning | review | `keyboard` declared, `keys` empty |
 | `DISPLAY_KEYBOARD_NO_HANDLER` | warning | review | `keyboard` declared, no key handler in the source (`src/keys.ts` itself does not count) |
@@ -275,11 +285,13 @@ the portrait ones.
 ## 9. Hosted builds
 
 `start_build` keeps the platform's own copy of `src/beyondplay-kit.ts`, and
-that copy can trail this kit's. The hosted build accepts `defineDisplay` once
-`get_contract`'s Display section no longer says "Not yet". Until then leave
-the declaration commented, as the template does: a config that imports
-`defineDisplay` fails the hosted build ("No matching export"), while the local
-ladder passes. A game that declares nothing needs no change either way.
+that copy can trail this kit's. `get_contract`'s Display section says whether
+the hosted build accepts `defineDisplay`. While it says "Not yet", a config
+that imports `defineDisplay` fails the hosted build ("No matching export")
+although the local ladder passes: tell your user rather than removing the
+declaration, because a game without it is phone-only and is not listed. The
+hosted check plays the game at its declared viewports and presses its
+declared keys, as `smoke:render` and `smoke:keys` do here.
 
 ## 10. Later
 

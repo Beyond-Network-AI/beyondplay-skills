@@ -232,6 +232,7 @@ export function checkDisplay(manifest, files, templateOwned, report) {
   const keys = d.keys;
   if (!isPlainObject(keys)) {
     error('DISPLAY_KEYS_INVALID', `${prefix}.keys is ${show(keys)}; it must be an object of verb -> key spec, such as { jump: 'space' }.`, 'Omit keys when the game has none; otherwise map each verb to its keys.');
+    checkPhoneOnly(keyboard, 0, warning);
     return checkHandlers(keyboard, files, templateOwned, report, extra);
   }
   const verbs = Object.keys(keys);
@@ -264,7 +265,21 @@ export function checkDisplay(manifest, files, templateOwned, report) {
   if (keyboard && !verbs.length) {
     warning('DISPLAY_KEYBOARD_NO_KEYS', "input lists 'keyboard' but keys is empty, so the host has no key hint to show.", "Declare each verb's keys: keys: { move: 'arrows|wasd', jump: 'space' }.");
   }
+  checkPhoneOnly(keyboard, verbs.length, warning);
   return checkHandlers(keyboard, files, templateOwned, report, extra);
+}
+
+/** Every listed game plays on a phone and on a desktop (DISPLAY_PHONE_ONLY, listing tier): 'keyboard' in
+ *  display.input with the keys that play it. A phone-only game still publishes, unlisted. */
+function checkPhoneOnly(keyboard, verbCount, warning) {
+  if (keyboard && verbCount) return;
+  warning(
+    'DISPLAY_PHONE_ONLY',
+    keyboard
+      ? "The game declares 'keyboard' but no keys, so it plays on a phone only: every listed game plays on a phone and on a desktop. It can publish unlisted; it is not listed until it declares the keys that play it."
+      : "The game plays on a phone only (display.input does not list 'keyboard'): every listed game plays on a phone and on a desktop. It can publish unlisted; it is not listed until it plays with keys too.",
+    "Build the desktop side: defineDisplay({ orientation: 'any', input: ['touch', 'mouse', 'keyboard'], keys: { move: 'arrows|wasd', jump: 'space' } }) in src/beyondplay.config.ts, a view that adapts to a wide screen (src/viewport.ts; a portrait game shows in a phone-shaped box on a desktop) and real key controls (bindKeys from src/keys.ts). npm run smoke:keys proves each declared key (docs/display.md).",
+  );
 }
 
 function checkHandlers(keyboard, files, templateOwned, report, extra) {

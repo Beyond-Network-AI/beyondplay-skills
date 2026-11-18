@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { TapTimingGame, DESIGN_W, DESIGN_H, DT, ROUNDS, ROUND_STEPS } from './game';
-import { challenge } from './beyondplay.config';
+import { challenge, display } from './beyondplay.config';
 import { getMatch } from './beyondplay-kit';
 import { haptic } from './haptics';
 import { can, onCapabilities, request } from './beyondplay-platform';
 import { EndCard, Hud, HudRow, Meter, Stat } from './beyondplay-hud';
 import { fitDesign, watchViewport } from './viewport';
+import { bindKeys } from './keys';
 
 // The shell: one canvas, a HUD, an end card. It converts real time into whole
 // engine steps and draws; it never decides gameplay. Replace the drawing with
@@ -99,6 +100,8 @@ export default function App() {
       if (g.phase === 'playing' && live.current) g.tap();
     };
     canvas.addEventListener('pointerdown', onPointerDown);
+    // Keys on a desktop: the verbs declared in src/beyondplay.config.ts (display.keys), an addition to touch.
+    const unbindKeys = bindKeys(display.keys, { tap: (down) => { if (down && g.phase === 'playing' && live.current) g.tap(); } });
 
     // Fit the design space to the viewport (letterboxed), device pixel ratio capped at 2 (src/viewport.ts).
     const view = { scale: 1, offX: 0, offY: 0 };
@@ -189,6 +192,7 @@ export default function App() {
       cancelAnimationFrame(raf);
       canvas.removeEventListener('pointerdown', onPointerDown);
       unwatchViewport();
+      unbindKeys();
     };
   }, []);
 

@@ -1,7 +1,7 @@
 // The only file the platform reads to learn what this game is. The build emits
 // dist/beyondplay.json from it. Keep it to the define* calls: no DOM, no game
 // code, nothing that runs at import time beyond these declarations.
-import { defineChallenge, defineSoloGame } from './beyondplay-kit';
+import { defineChallenge, defineDisplay, defineSoloGame } from './beyondplay-kit';
 
 export const challenge = defineChallenge({
   metricLabel: 'Score',     // metres run plus ten a coin
@@ -18,3 +18,12 @@ export const challenge = defineChallenge({
 // `uses` names the platform capabilities the game asks for through
 // src/beyondplay-platform.ts (request('share') on the end card here).
 export const game = defineSoloGame({ challenge, uses: ['share'] });
+
+// Phone and desktop (docs/display.md): a swipe or a tap on a phone, the keys
+// below on a desktop (src/App.tsx binds them). The camera follows the screen's
+// shape, so the view adapts to a wide screen too.
+export const display = defineDisplay({
+  orientation: 'any',
+  input: ['touch', 'mouse', 'keyboard'],
+  keys: { move: 'left/right|a/d', jump: 'up|w|space', slide: 'down|s' },
+});

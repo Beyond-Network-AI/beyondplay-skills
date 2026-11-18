@@ -21,9 +21,12 @@ Facts that shape every decision:
 - One config file: `src/beyondplay.config.ts`. The build emits
   `dist/beyondplay.json` from it. Nothing else declares the game to the platform.
 - Mobile first, portrait first, one thumb. Runs last 30 to 90 seconds, restart
-  is instant, and there is one clear score. A wide view on a large screen and
-  keys are additions, declared with `defineDisplay` (`docs/display.md`); most
-  games declare nothing.
+  is instant, and there is one clear score.
+- Phone and desktop, always. Every listed game also plays on a desktop: keys
+  that really play it (and a wide view when it adapts), declared with
+  `defineDisplay` (`docs/display.md`). A phone-only game publishes unlisted but
+  is not listed (`DISPLAY_PHONE_ONLY`). Build both from the start; never ask
+  whether to. The template already declares Space or Enter to tap.
 - The feed is a swipe surface: the card is already playing when it scrolls in.
   No title screen, no tap-to-start, no instruction text.
 - Duels: the platform hands both players the same seed. Same seed plus same

@@ -97,9 +97,12 @@ export const game = defineSoloGame({ challenge });
   `buildManifest()` and returns it with the defaults filled (`GameDisplay`),
   so the shell can `import { display } from './beyondplay.config'` and
   `bindKeys(display.keys, ...)` from `src/keys.ts`. Nothing touches `window`.
-  A game that declares nothing gets `DEFAULT_DISPLAY`. The hosted build
-  accepts it once `get_contract`'s Display section no longer says "Not yet";
-  until then keep it commented, as the template does.
+  A game that declares nothing gets `DEFAULT_DISPLAY`, a phone-only game:
+  every listed game plays on a phone and on a desktop, so it declares
+  `'keyboard'` with the keys that play it (`DISPLAY_PHONE_ONLY`, listing tier,
+  otherwise), as the template does. The hosted build keeps the platform's own
+  copy of the kit: `get_contract`'s Display section says when it accepts
+  `defineDisplay`.
 - `getMatch()`: the shared duel instance or `null` for a normal play. Fields:
   `seed`, `challengeId`, `mode` (`'score_duel'` in v1), `opponentScore`,
   `opponentName`, `metricLabel`, `lowerIsBetter`.

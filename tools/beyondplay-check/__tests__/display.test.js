@@ -167,8 +167,7 @@ describe('checkDisplay', () => {
     expect(normalizeDisplay(display)).toEqual(display);
   });
 
-  it('is silent for the defaults, a missing manifest and an older kit without display', () => {
-    expect(run(filled({})).issues).toEqual([]);
+  it('is silent for a missing manifest and an older kit without display', () => {
     expect(run(undefined).issues).toEqual([]);
     const report = createReport({});
     checkDisplay(null, [], new Set(), report);
@@ -189,10 +188,10 @@ describe('checkDisplay', () => {
     expect(codes(r)).not.toContain('DISPLAY_INPUT_NO_POINTER');
 
     r = run({ orientation: 'portrait', input: [], keys: {} });
-    expect(codes(r)).toEqual(['DISPLAY_INPUT_UNKNOWN']);
+    expect(codes(r)).toEqual(['DISPLAY_INPUT_UNKNOWN', 'DISPLAY_PHONE_ONLY']);
 
     r = run({ orientation: 'portrait', input: 'keyboard', keys: {} });
-    expect(codes(r)).toEqual(['DISPLAY_INPUT_UNKNOWN']);
+    expect(codes(r)).toEqual(['DISPLAY_INPUT_UNKNOWN', 'DISPLAY_PHONE_ONLY']);
 
     r = run(filled({ input: ['mouse', 'keyboard'], keys: { jump: 'space' } }));
     expect(issue(r, 'DISPLAY_INPUT_NO_POINTER')).toMatchObject({ severity: 'error' });
@@ -221,8 +220,23 @@ describe('checkDisplay', () => {
 
   it('reports a display that is not an object on every field', () => {
     const r = run(null);
-    expect(codes(r)).toEqual(['DISPLAY_INPUT_UNKNOWN', 'DISPLAY_KEYS_INVALID', 'DISPLAY_ORIENTATION_INVALID']);
+    expect(codes(r)).toEqual(['DISPLAY_INPUT_UNKNOWN', 'DISPLAY_KEYS_INVALID', 'DISPLAY_ORIENTATION_INVALID', 'DISPLAY_PHONE_ONLY']);
     expect(issue(r, 'DISPLAY_ORIENTATION_INVALID').message).toMatch(/not an object/);
+  });
+
+  it('flags a phone-only game for listing (DISPLAY_PHONE_ONLY): no keyboard, or keyboard without keys', () => {
+    for (const decl of [{}, { orientation: 'any' }, { input: ['touch', 'mouse', 'keyboard'] }]) {
+      const r = run(filled(decl));
+      expect(issue(r, 'DISPLAY_PHONE_ONLY'), JSON.stringify(decl)).toMatchObject({ severity: 'warning', tier: 'listing', path: 'src/beyondplay.config.ts' });
+      expect(issue(r, 'DISPLAY_PHONE_ONLY').message).toMatch(/phone and on a desktop/);
+      expect(issue(r, 'DISPLAY_PHONE_ONLY').remediation).toMatch(/smoke:keys/);
+      expect(r.ok).toBe(true);
+    }
+    expect(issue(run(filled({ input: ['touch', 'mouse', 'keyboard'] })), 'DISPLAY_PHONE_ONLY').message).toMatch(/no keys/);
+    // Keys with keyboard plays on a desktop, whatever the orientation (a portrait game shows in a phone-shaped box).
+    for (const orientation of ['portrait', 'any', 'landscape']) {
+      expect(codes(run(filled({ orientation, input: ['touch', 'mouse', 'keyboard'], keys: { jump: 'space' } }))), orientation).not.toContain('DISPLAY_PHONE_ONLY');
+    }
   });
 
   it('recognises key handlers on code lines only', () => {
