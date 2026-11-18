@@ -74,6 +74,11 @@ describe('perfIssues', () => {
   it('lets a frame of exactly two display refreshes pass as the 30 fps floor, and fires on the next one up', () => {
     expect(codes(perfIssues({ ...ok, frame: { frames: 500, p95: 33.3 } }))).toEqual([]);
     expect(codes(perfIssues({ ...ok, frame: { frames: 500, p95: 50 } }))).toEqual(['GAME_FRAME_TIME']);
+    // A WebGL game measured without a graphics card: the frame time is reported, never judged.
+    const soft = perfIssues({ ...ok, softwareGl: true, frame: { frames: 30, p95: 366.7 }, drawCalls: 15, triangles: 27817 });
+    expect(soft.map((i) => [i.code, i.severity])).toContainEqual(['GAME_FRAME_TIME_NOT_JUDGED', 'info']);
+    expect(codes(soft)).not.toContain('GAME_FRAME_TIME');
+    expect(codes(perfIssues({ ...ok, softwareGl: true, frame: { frames: 30, p95: 366.7 }, drawCalls: 90 }))).toContain('GAME_DRAW_CALLS');
     expect(perfIssues({ ...ok, frame: { frames: 500, p95: 50 } })[0].message).toContain('50 ms over 500 frames');
   });
 

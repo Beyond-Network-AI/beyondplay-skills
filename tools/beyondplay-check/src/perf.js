@@ -45,7 +45,7 @@ export const PERF_SETUP = {
   stepsPerSecond: 60,
 };
 
-export const PERF_CODES = ['GAME_SLOW_FIRST_FRAME', 'GAME_FRAME_TIME', 'GAME_DRAW_CALLS', 'GAME_TRIANGLES', 'GAME_HEAP'];
+export const PERF_CODES = ['GAME_SLOW_FIRST_FRAME', 'GAME_FRAME_TIME', 'GAME_FRAME_TIME_NOT_JUDGED', 'GAME_DRAW_CALLS', 'GAME_TRIANGLES', 'GAME_HEAP'];
 
 const MB = 1024 * 1024;
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
@@ -83,7 +83,12 @@ export function perfIssues(m = {}, limits = PERF_LIMITS) {
     add('warning', 'GAME_SLOW_FIRST_FRAME', `No first frame within ${fmtS(m.firstFrameMissing)}: neither bp_ready nor a drawn canvas.`, INSTEAD.GAME_SLOW_FIRST_FRAME);
   }
   const p95 = m.frame?.p95;
-  if (finite(p95) && p95 > limits.frameP95Ms + (limits.frameSlackMs ?? 0)) {
+  if (m.softwareGl) {
+    // A WebGL game on a machine with no graphics card: the frame time measures the machine's
+    // software 3D, not the game. It is reported and never judged; draw calls and triangles are
+    // the budget a 3D game is held to.
+    if (finite(p95)) add('info', 'GAME_FRAME_TIME_NOT_JUDGED', `The game draws with WebGL and the check machine has no graphics card, so the frame time (${p95} ms at the 95th percentile) measures software 3D, not the game, and is not judged.`, INSTEAD.GAME_FRAME_TIME_NOT_JUDGED);
+  } else if (finite(p95) && p95 > limits.frameP95Ms + (limits.frameSlackMs ?? 0)) {
     add('warning', 'GAME_FRAME_TIME', `The 95th percentile frame time was ${p95} ms over ${m.frame.frames} frames of driven play (four times CPU throttling); the floor is ${limits.frameP95Ms} ms (30 fps), the target 16.7 ms (60 fps).`, INSTEAD.GAME_FRAME_TIME);
   }
   if (finite(m.drawCalls) && m.drawCalls > limits.drawCalls) {
@@ -157,6 +162,18 @@ export function drivenPlay(t, ctx) {
   }
   const total = Math.max(1, ticks);
   const perf = typeof t.perf === 'function' ? () => { try { return t.perf(); } catch { return null; } } : null;
+  // Does the game draw with WebGL (a canvas that refuses a 2D context already has another), and
+  // is WebGL drawn in software here (a check machine with no graphics card)? Read after play.
+  const glOf = () => {
+    let webgl = false; let renderer = 'none';
+    try { webgl = [...document.querySelectorAll('canvas')].some((c) => { try { return c.getContext('2d') === null; } catch { return true; } }); } catch { /* no canvas */ }
+    try {
+      const gl = document.createElement('canvas').getContext('webgl');
+      const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      if (gl) renderer = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+    } catch { /* no WebGL at all */ }
+    return { webgl, glRenderer: renderer.slice(0, 120), softwareGl: webgl && /swiftshader|llvmpipe|software|basic render|none/i.test(renderer) };
+  };
   return new Promise((resolve) => {
     t.reset();
     let done = 0; let next = 0; let replays = 1;
@@ -180,7 +197,7 @@ export function drivenPlay(t, ctx) {
         if (p && Number.isFinite(p.triangles)) triangles = Math.max(triangles ?? 0, p.triangles);
       }
       if (now - start < Math.max(ctx.seconds, ctx.totalSeconds ?? 0) * 1000) requestAnimationFrame(frame);
-      else resolve({ deltas: deltas.slice(1), drawCalls, triangles, replays, recordedTicks: ticks });
+      else resolve({ deltas: deltas.slice(1), drawCalls, triangles, replays, recordedTicks: ticks, ...glOf() });
     };
     requestAnimationFrame(frame);
   });

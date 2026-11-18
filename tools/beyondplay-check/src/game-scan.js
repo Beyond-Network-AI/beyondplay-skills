@@ -47,8 +47,20 @@ const LEADERBOARD = /\.leaderboard\s*\(/;
 /** The simulation file the contract names; items never reach it (GAME_ITEM_IN_SIMULATION). */
 const SIMULATION_FILE = 'src/game.ts';
 const ITEM_IN_SIMULATION = /player\.items|PlayerItem/;
-/** The one capability whose `uses` entry names a collection: 'player.items:cobi'. */
-const COLLECTION_CAPABILITY = 'player.items';
+/** The store helper: what a player bought is look and sound, so it never reaches the simulation (GAME_STORE_IN_SIMULATION). */
+const STORE_HELPER = /beyondplay-store\b/;
+/** A purchase of the game's own: a payment provider, a payment form or a price in money (GAME_OWN_PAYMENT). */
+const OWN_PAYMENT = [
+  /\b(?:stripe|paypal|braintree|adyen)\b/i, /\bnew\s+PaymentRequest\b/, /\bApplePaySession\b/, /\b(?:credit|debit) card\b/i, /\bcard number\b/i,
+  /[$€£]\s?\d{1,4}[.,]\d{2}(?!\d)/, /\b\d{1,4}[.,]\d{2}\s?(?:USD|EUR|GBP)\b/,
+];
+/** Random or hidden contents for sale (GAME_STORE_RANDOM); only looked for in a game that uses the store. */
+const STORE_RANDOM = /\bloot ?box|\bgacha\b|\bmystery (?:box|crate|chest|item)|\blucky (?:draw|spin|wheel)/i;
+/** The capabilities whose `uses` entry names what they are for: a collection ('player.items:cobi'), a kit ('player.avatar:ape'). */
+const QUALIFIED = {
+  'player.items': { what: 'collection', example: 'cobi', request: "request('player.items', { collection: 'cobi' })" },
+  'player.avatar': { what: 'kit', example: 'ape', request: "request('player.avatar', { kit: 'ape' })" },
+};
 const COLLECTION_SLUG = /^[a-z0-9][a-z0-9-]*$/;
 
 export function textFiles(files, templateOwned) {
@@ -89,6 +101,15 @@ export function scanSource(gameDir, files, templateOwned, report) {
     }
   }
 
+  // What a player bought is look and sound too: the store helper never reaches the simulation.
+  if (simulation) {
+    const at = simulation.text.split('\n').findIndex((line) => STORE_HELPER.test(line) && !COMMENT_LINE.test(line));
+    if (at >= 0) {
+      report.error('GAME_STORE_IN_SIMULATION', simulation.rel, `The store helper appears in ${SIMULATION_FILE}; the simulation never sees what a player bought, so boards and duels stay fair.`, 'Read owns() in src/App.tsx and pass only the look (a skin, a trail, a sound) to the renderer.', { line: at + 1, docs: DOCS.store });
+    }
+  }
+  const usesStore = sources.some((s) => s.rel !== 'src/beyondplay.config.ts' && STORE_HELPER.test(s.text)) || /\bdefineStore\s*\(/.test(all);
+
   for (const s of sources) {
     const lines = s.text.split('\n');
     const seen = new Set();
@@ -116,6 +137,10 @@ export function scanSource(gameDir, files, templateOwned, report) {
         if (SHARE_INTENT.test(line) || (SHARE_LABEL.test(line) && !SHARE_REQUEST.test(s.text))) once('share', () => report.warning('GAME_SHARE_BUTTON', s.rel, 'A share intent, social card or clipboard write of the game\'s own; the platform shares the game with its own card.', 'Replace it with request(\'share\', { score }) from src/beyondplay-platform.ts and declare uses: [\'share\']; the host opens the platform\'s sheet.', { line: no, docs: DOCS.capabilities }));
         if (START_GATE.test(line)) once('startgate', () => report.warning('GAME_START_GATE', s.rel, 'A Play or Start control, splash or "created by" card: the feed card must already be playing when it scrolls in.', 'Boot straight into a run; put restart on the end card and any picker behind a small settings control or after game over.', { line: no, docs: DOCS.mobile }));
         if (INSTRUCTION_TEXT.test(line)) once('instructions', () => report.warning('GAME_INSTRUCTION_TEXT', s.rel, 'Instruction text ("tap to", "how to play") in the UI.', 'Remove it; the first seconds of a run teach the one input.', { line: no, docs: DOCS.mobile }));
+        for (const re of OWN_PAYMENT) {
+          if (re.test(line)) once('payment', () => report.error('GAME_OWN_PAYMENT', s.rel, 'A payment provider, a payment form or a price in money; every purchase goes through the platform\'s own sheet, in B-Bucks.', 'Remove it. Declare the item with defineStore, show its price with the HUD kit\'s Price chip and call buy(id) from src/beyondplay-store.ts.', { line: no, docs: DOCS.store }));
+        }
+        if (usesStore && STORE_RANDOM.test(line)) once('storerandom', () => report.warning('GAME_STORE_RANDOM', s.rel, 'A loot box, a mystery item or a draw in a game that sells items; a player always sees exactly what they buy.', 'Sell each item by itself, by its name and picture; random rewards are for play, never for B-Bucks.', { line: no, docs: DOCS.store }));
         if (DAILY_REWARD.test(line)) once('daily', () => report.info('GAME_DAILY_REWARD', s.rel, 'A daily reward or login bonus inside the game; it reads the wall clock and the platform cannot see it.', 'Keep rewards cosmetic and local, or ask the platform for a daily challenge; never purchase or earnings language.', { line: no, docs: DOCS.contract }));
       }
       if (MOUSE_TOUCH.test(line)) once('mousetouch', () => report.warning('GAME_MOUSE_TOUCH_EVENTS', s.rel, 'Mouse or touch event handlers found; mobile input must use pointer events only.', 'Use pointerdown/move/up/cancel with setPointerCapture (a non-passive touchmove guard that only cancels scrolling is fine).', { line: no, docs: DOCS.mobile }));
@@ -188,7 +213,37 @@ export function checkAudioLicence(gameDir, files, report) {
   report.warning('GAME_AUDIO_LICENCE_MISSING', audio[0].rel, `${audio.length} audio file${audio.length === 1 ? '' : 's'} shipped but no CREDITS.md (or LICENCE note) found in the game folder.`, 'Add a CREDITS.md naming each track: title, author, source and licence. The licence must allow commercial games (CC0 is the default; the creator attests to the list on submission).', { docs: DOCS.playbookAudio });
 }
 
-/** A `uses` entry split into the capability and, for player.items, its collection ('player.items:cobi'). */
+/**
+ * Library assets. A file under public/assets/library/ came from the asset library
+ * (add_asset), which also gives its CREDITS.md line, tagged "[library: <id>]" where
+ * the id is the file's path under that folder without its extension. A file with no
+ * such line is a listing finding: the credit is how the licence travels with the game.
+ */
+export function checkLibraryCredits(gameDir, files, report) {
+  const PREFIX = 'public/assets/library/';
+  const lib = files.filter((f) => f.rel.startsWith(PREFIX));
+  if (!lib.length) return;
+  const credits = files.find((f) => /^credits\.md$/i.test(f.rel));
+  const text = credits ? readFileSync(credits.abs, 'utf8') : '';
+  const missing = lib.filter((f) => !text.includes(`[library: ${f.rel.slice(PREFIX.length).replace(/\.[a-z0-9]+$/i, '')}]`));
+  if (!missing.length) return;
+  const names = missing.slice(0, 3).map((f) => f.rel).join(', ');
+  report.warning('GAME_LIBRARY_CREDIT_MISSING', missing[0].rel, `${missing.length} library asset${missing.length === 1 ? ' has' : 's have'} no line in CREDITS.md: ${names}${missing.length > 3 ? ', ...' : ''}.`, 'Add the credits line add_asset gave for each (under "## Library assets" in CREDITS.md), or remove the file.', { docs: DOCS.playbookAudio });
+}
+
+/**
+ * The HUD kit: a game that draws its own score, buttons and end card is noted for the reviewer.
+ * A game that imports the kit anywhere in src/ passes; the check never blocks a build.
+ */
+export function checkHud(files, report) {
+  const sources = files.filter((f) => /^src\/.+\.(tsx?|jsx?)$/.test(f.rel) && f.rel !== 'src/beyondplay-hud.tsx');
+  if (!sources.length) return;
+  const uses = sources.some((f) => /from\s+['"]\.{1,2}\/(?:[\w-]+\/)*beyondplay-hud['"]/.test(readFileSync(f.abs, 'utf8')));
+  if (uses) return;
+  report.warning('GAME_HUD_NOT_KIT', 'src/App.tsx', 'The game does not use the HUD kit (src/beyondplay-hud.tsx) for what it shows over the play.', 'Build the score, the timer, lives, buttons and the end card from ./beyondplay-hud (Hud, HudRow, Stat, Timer, Hearts, Meter, HudButton, Stick, EndCard); setHudTheme() changes its colours.');
+}
+
+/** A `uses` entry split into the capability and what it names: player.items a collection ('player.items:cobi'), player.avatar a kit ('player.avatar:ape'). */
 export function parseUse(entry) {
   const i = entry.indexOf(':');
   if (i < 0) return { name: entry, collection: null };
@@ -209,6 +264,9 @@ export function parseUse(entry) {
  * on the platform; get_contract serves it, and the host answers denied for one
  * the manifest does not declare), so only the slug's shape is checked here.
  */
+const SAVE_HELPER_IMPORT = /from\s+['"]\.{1,2}\/(?:[\w-]+\/)*beyondplay-save['"]/;
+const STORE_HELPER_IMPORT = /from\s+['"]\.{1,2}\/(?:[\w-]+\/)*beyondplay-store['"]/;
+
 export function checkCapabilities(files, templateOwned, manifest, report) {
   const found = new Map();
   for (const f of textFiles(files, templateOwned)) {
@@ -219,6 +277,10 @@ export function checkCapabilities(files, templateOwned, manifest, report) {
       for (const m of line.matchAll(CAPABILITY_CALL)) {
         if (!found.has(m[1])) found.set(m[1], { rel: f.rel, line: i + 1 });
       }
+      // The save helper asks for player.save on the game's behalf: importing it is using the capability.
+      if (SAVE_HELPER_IMPORT.test(line) && !found.has('player.save')) found.set('player.save', { rel: f.rel, line: i + 1 });
+      // And the store helper asks for the store: a game that imports it must declare its items.
+      if (STORE_HELPER_IMPORT.test(line) && !found.has('store')) found.set('store', { rel: f.rel, line: i + 1 });
     });
   }
   const names = [...found.keys()].sort();
@@ -228,7 +290,7 @@ export function checkCapabilities(files, templateOwned, manifest, report) {
   const collections = new Map();
   for (const entry of declared ?? []) {
     const { name, collection } = parseUse(entry);
-    if (collection === null || name !== COLLECTION_CAPABILITY) continue;
+    if (collection === null || !QUALIFIED[name]) continue;
     if (!collections.has(name)) collections.set(name, []);
     collections.get(name).push(entry);
   }
@@ -237,10 +299,13 @@ export function checkCapabilities(files, templateOwned, manifest, report) {
     const at = found.get(name);
     if (!CAPABILITY_NAMES.includes(name)) {
       report.error('GAME_CAPABILITY_UNKNOWN', at.rel, `request('${name}') asks for a capability the contract does not list; the host answers it as unsupported.`, `Use one of: ${CAPABILITY_NAMES.join(', ')}. get_contract on the creator MCP serves the table with what each returns.`, { line: at.line, docs: DOCS.capabilities });
-    } else if (declared && name === COLLECTION_CAPABILITY && !collections.has(name)) {
-      // A bare 'player.items' in uses names no collection; the host answers denied for one the manifest does not declare.
-      report.error('GAME_CAPABILITY_UNDECLARED', at.rel, `request('${name}') is used but ${declared.includes(name) ? `a bare '${name}' in uses names no collection` : 'uses carries no player.items:<collection> entry'}; declare the collection: uses: ['player.items:cobi'].`, `Declare the collection in src/beyondplay.config.ts (defineSoloGame({ challenge, uses: ['player.items:cobi'] })) and request('player.items', { collection: 'cobi' }) in src/App.tsx.`, { line: at.line, docs: DOCS.playerItems });
-    } else if (declared && name !== COLLECTION_CAPABILITY && !declared.includes(name)) {
+    } else if (declared && QUALIFIED[name] && !collections.has(name)) {
+      // A bare 'player.items' (or 'player.avatar') in uses names no collection (kit); the host answers denied for one the manifest does not declare.
+      const q = QUALIFIED[name], eg = `${name}:${q.example}`;
+      report.error('GAME_CAPABILITY_UNDECLARED', at.rel, `request('${name}') is used but ${declared.includes(name) ? `a bare '${name}' in uses names no ${q.what}` : `uses carries no ${name}:<${q.what}> entry`}; declare the ${q.what}: uses: ['${eg}'].`, `Declare the ${q.what} in src/beyondplay.config.ts (defineSoloGame({ challenge, uses: ['${eg}'] })) and ${q.request} in src/App.tsx.`, { line: at.line, docs: name === 'player.items' ? DOCS.playerItems : DOCS.capabilities });
+    } else if (declared && name === 'store' && !declared.includes(name)) {
+      report.error('GAME_CAPABILITY_UNDECLARED', at.rel, 'The game uses the store but the config declares no items.', "Declare the items in src/beyondplay.config.ts: import { defineStore } from './beyondplay-store' and defineStore({ items: [{ id: 'trail-neon', name: 'Neon trail', price: 150 }] }); it declares the store for you.", { line: at.line, docs: DOCS.store });
+    } else if (declared && !QUALIFIED[name] && !declared.includes(name)) {
       report.error('GAME_CAPABILITY_UNDECLARED', at.rel, `request('${name}') is used but the config does not declare it.`, `Add '${name}' to uses in src/beyondplay.config.ts: defineSoloGame({ challenge, uses: ['${name}'] }).`, { line: at.line, docs: DOCS.capabilities });
     }
   }
@@ -248,8 +313,8 @@ export function checkCapabilities(files, templateOwned, manifest, report) {
     for (const entry of declared) {
       const { name, collection } = parseUse(entry);
       if (!CAPABILITY_NAMES.includes(name)) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${entry}', which the contract does not list.`, `Declare only: ${CAPABILITY_NAMES.join(', ')} (player.items with its collection: player.items:cobi).`, { docs: DOCS.capabilities });
-      else if (collection !== null && name !== COLLECTION_CAPABILITY) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${entry}'; only player.items takes a collection after the colon.`, `Declare '${name}' on its own.`, { docs: DOCS.capabilities });
-      else if (collection !== null && !COLLECTION_SLUG.test(collection)) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${entry}'; a collection slug is lowercase letters, digits and hyphens ('cobi').`, `Declare the slug as the platform lists it: get_contract on the creator MCP serves the collections offered to games.`, { docs: DOCS.playerItems });
+      else if (collection !== null && !QUALIFIED[name]) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${entry}'; only player.items (a collection) and player.avatar (a kit) take a name after the colon.`, `Declare '${name}' on its own.`, { docs: DOCS.capabilities });
+      else if (collection !== null && !COLLECTION_SLUG.test(collection)) report.warning('GAME_CAPABILITY_UNKNOWN', 'src/beyondplay.config.ts', `uses declares '${entry}'; a ${QUALIFIED[name].what} name is lowercase letters, digits and hyphens ('${QUALIFIED[name].example}').`, `Declare the name as the platform lists it: get_contract on the creator MCP serves the collections and kits offered to games.`, { docs: name === 'player.items' ? DOCS.playerItems : DOCS.capabilities });
     }
   }
   return names;

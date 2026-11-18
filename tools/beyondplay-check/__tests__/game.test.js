@@ -51,6 +51,27 @@ describe('beyondplay-check game', () => {
     expect(i.remediation).toMatch(/template\/src\/main\.tsx/);
   });
 
+  it('an edited template helper is scanned as the creator\'s code, and the audio helper may not be edited', async () => {
+    // A helper outside the contract (haptics.ts) may be changed, but then the source scan reads it.
+    append(join(dir, 'src/haptics.ts'), "fetch('https://tracker.example.com/beacon');");
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_DRIFT')).toMatchObject({ severity: 'warning', path: 'src/haptics.ts' });
+    expect(issue(r, 'GAME_EXTERNAL_REQUEST')).toMatchObject({ severity: 'error', path: 'src/haptics.ts' });
+    expect(r.ok).toBe(false);
+    // The audio helper is platform-owned: an edit is an error, and the edited copy is scanned too.
+    const audio = copyGame(tmp('bpcheck-audio-'));
+    append(join(audio, 'src/beyondplay-audio.ts'), "fetch('https://tracker.example.com/beacon');");
+    r = await checkGame(audio, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-audio.ts' });
+    expect(r.issues.some((i) => i.code === 'GAME_EXTERNAL_REQUEST' && i.path === 'src/beyondplay-audio.ts')).toBe(true);
+    // A game scaffolded before the helper existed may ship without it.
+    rmSync(join(audio, 'src/beyondplay-audio.ts'));
+    r = await checkGame(audio, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MISSING');
+    expect(r.ok).toBe(true);
+    rmSync(audio, { recursive: true, force: true });
+  });
+
   it('lets index.html change only its <title>', async () => {
     const idx = join(dir, 'index.html');
     writeFileSync(idx, readFileSync(idx, 'utf8').replace(/<title>[^<]*<\/title>/, '<title>Renamed Game</title>'));
@@ -104,6 +125,77 @@ describe('beyondplay-check game', () => {
     expect((await checkGame(warn, { template: TEMPLATE })).ok).toBe(true);
     expect((await checkGame(warn, { template: TEMPLATE, failLevel: 'warning' })).ok).toBe(false);
     rmSync(warn, { recursive: true, force: true });
+  });
+
+  it('the HUD kit may not be edited, and a game that does not use it is noted for the reviewer', async () => {
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_HUD_NOT_KIT');
+    append(join(dir, 'src/beyondplay-hud.tsx'), 'export const mine = 1;');
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-hud.tsx' });
+    // A game scaffolded before the kit existed has no copy: drift, not an error; its own HUD is a review note.
+    rmSync(join(dir, 'src/beyondplay-hud.tsx'));
+    const app = join(dir, 'src/App.tsx');
+    writeFileSync(app, readFileSync(app, 'utf8').replace(/^import \{[^}]*\} from '\.\/beyondplay-hud';\n/m, 'const Hud = (p) => p.children; const HudRow = () => null; const Stat = () => null; const Meter = () => null; const EndCard = () => null;\n'));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MODIFIED');
+    expect(issue(r, 'GAME_HUD_NOT_KIT')).toMatchObject({ severity: 'warning', tier: 'review', path: 'src/App.tsx' });
+  });
+
+  it('a challenge with no bound on its winning side is noted for the reviewer', async () => {
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_SCORE_UNBOUNDED');
+    const config = join(dir, 'src/beyondplay.config.ts');
+    writeFileSync(config, readFileSync(config, 'utf8').replace(/^\s*maxValue:.*\n/m, ''));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(issue(r, 'GAME_SCORE_UNBOUNDED')).toMatchObject({ severity: 'warning', tier: 'review', path: 'src/beyondplay.config.ts' });
+    expect(issue(r, 'GAME_SCORE_UNBOUNDED').message).toContain('maxValue');
+  });
+
+  it('the animation helper may not be edited, and a game may ship without it', async () => {
+    append(join(dir, 'src/beyondplay-anim.ts'), 'export const mine = 1;');
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-anim.ts' });
+    rmSync(join(dir, 'src/beyondplay-anim.ts'));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MODIFIED');
+  });
+
+  it('the characters helper may not be edited, and a game may ship without it', async () => {
+    append(join(dir, 'src/beyondplay-characters.ts'), 'export const mine = 1;');
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-characters.ts' });
+    rmSync(join(dir, 'src/beyondplay-characters.ts'));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.ok).toBe(true);
+    expect(codes(r)).not.toContain('GAME_TEMPLATE_FILE_MODIFIED');
+  });
+
+  it('the library\'s characters and moves load from the asset host, which is not an external request', async () => {
+    append(join(dir, 'src/App.tsx'), [
+      "const index = 'https://assets.beyondplay.xyz/library/manifests/index.json';",
+      "const ape = 'https://assets.beyondplay.xyz/library/v0/bullieverse-3d/character/ape.1a2b3c4d.glb';",
+      "const wave = 'https://assets.beyondplay.xyz/library/v0/bullieverse-moves/moves/ape/wave.3f9a1c2e.glb';",
+      "fetch(index); fetch(ape); fetch(wave);",
+    ].join('\n'));
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_EXTERNAL_REQUEST');
+    expect(codes(r)).not.toContain('GAME_EXTERNAL_URL');
+  });
+
+  it('a library asset needs its line in CREDITS.md, and the asset host is not an external request', async () => {
+    write(join(dir, 'public/assets/library/sfx-core/coin/coin-01.ogg'), Buffer.alloc(64, 1));
+    append(join(dir, 'src/App.tsx'), "const kitBase = 'https://assets.beyondplay.xyz/library/v0/music-core/loop/arcade-level-1.ogg';");
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_LIBRARY_CREDIT_MISSING')).toMatchObject({ severity: 'warning', tier: 'listing', path: 'public/assets/library/sfx-core/coin/coin-01.ogg' });
+    expect(codes(r)).not.toContain('GAME_EXTERNAL_REQUEST');
+    write(join(dir, 'CREDITS.md'), '# Credits\n\n## Library assets\n\n- Coins by Someone (CC0-1.0) [library: sfx-core/coin/coin-01]\n');
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_LIBRARY_CREDIT_MISSING');
+    expect(codes(r)).not.toContain('GAME_AUDIO_LICENCE_MISSING');
   });
 
   it('reports links out, identity prompts and share buttons, each with its tier', async () => {
@@ -166,8 +258,15 @@ describe('beyondplay-check game', () => {
 
     write(join(dist, 'models/arena.glb'), Buffer.alloc(26 * MB, 1));
     r = await checkGame(dir, { template: TEMPLATE });
-    expect(issue(r, 'GAME_PUBLISHED_WEIGHT_HEAVY')).toMatchObject({ severity: 'warning', tier: 'listing', path: 'dist' });
+    expect(issue(r, 'GAME_PUBLISHED_WEIGHT_HEAVY')).toMatchObject({ severity: 'warning', tier: 'review', path: 'dist' });
     expect(issue(r, 'GAME_PUBLISHED_WEIGHT_HEAVY').message).toContain('dist/models/arena.glb');
+    expect(codes(r)).not.toContain('GAME_PUBLISHED_WEIGHT_TOO_HEAVY');
+    write(join(dist, 'models/arena-2.glb'), Buffer.alloc(9 * MB, 1));
+    write(join(dist, 'models/arena-3.glb'), Buffer.alloc(9 * MB, 1));
+    write(join(dist, 'models/arena-4.glb'), Buffer.alloc(9 * MB, 1));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_PUBLISHED_WEIGHT_TOO_HEAVY')).toMatchObject({ severity: 'warning', tier: 'listing', path: 'dist' });
+    expect(codes(r)).not.toContain('GAME_PUBLISHED_WEIGHT_HEAVY');
     rmSync(join(dist, 'models'), { recursive: true, force: true });
 
     write(join(dist, 'beyondplay.json'), JSON.stringify({ ...manifest, defaultUnitId: 'other' }));
@@ -197,6 +296,93 @@ describe('beyondplay-check game', () => {
     expect(issue(r, 'GAME_CAPABILITY_UNDECLARED').message).toContain("request('player.profile')");
     expect(issue(r, 'GAME_CAPABILITY_UNKNOWN')).toMatchObject({ severity: 'error', tier: 'listing' });
     expect(issue(r, 'GAME_SHARE_BUTTON')).toMatchObject({ severity: 'warning', tier: 'listing' });
+  });
+
+  it('a declared store passes; the helper may not be edited; importing it without declaring items is caught', async () => {
+    const config = join(dir, 'src/beyondplay.config.ts');
+    const app = join(dir, 'src/App.tsx');
+    append(app, "import { buy, owns, storeItems } from './beyondplay-store';\nvoid storeItems().then(() => { if (!owns('trail-neon')) buy('trail-neon').catch(() => {}); });");
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.facts.uses).toEqual(['share', 'store']);
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED')).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/App.tsx' });
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED').remediation).toContain('defineStore');
+
+    write(join(dir, 'public/assets/items/trail-neon.png'), 'png');
+    writeFileSync(config, "import { defineStore } from './beyondplay-store';\n" + readFileSync(config, 'utf8') + "\ndefineStore({ items: [{ id: 'trail-neon', name: 'Neon trail', blurb: 'A glowing trail.', image: 'assets/items/trail-neon.png', price: 150 }, { id: 'hat-gold', name: 'Gold hat', price: 2000 }] });\n");
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNKNOWN');
+    expect(codes(r)).not.toContain('GAME_STORE_ITEMS_INVALID');
+    expect(r.facts.storeItems).toEqual(['trail-neon', 'hat-gold']);
+
+    append(join(dir, 'src/beyondplay-store.ts'), 'export const mine = 1;');
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-store.ts' });
+  });
+
+  it('names each item that breaks a store limit', async () => {
+    const config = join(dir, 'src/beyondplay.config.ts');
+    const items = [
+      "{ id: 'ok-item', name: 'Fine', price: 50 }",
+      "{ id: 'Bad Id', name: 'x', price: 100 }",
+      "{ id: 'ok-item', name: 'Twice', price: 100 }",
+      "{ id: 'no-name', name: '  ', price: 100 }",
+      "{ id: 'cheap', name: 'Cheap', price: 49 }",
+      "{ id: 'dear', name: 'Dear', price: 2001 }",
+      "{ id: 'half', name: 'Half', price: 99.5 }",
+      "{ id: 'far', name: 'Far', price: 100, image: 'https://elsewhere.example/a.png' }",
+      "{ id: 'gone', name: 'Gone', price: 100, image: 'assets/items/missing.png' }",
+      `{ id: 'long', name: '${'n'.repeat(41)}', price: 100 }`,
+    ];
+    writeFileSync(config, "import { defineStore } from './beyondplay-store';\n" + readFileSync(config, 'utf8') + `\ndefineStore({ items: [${items.join(', ')}] });\n`);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    const found = r.issues.filter((i) => i.code === 'GAME_STORE_ITEMS_INVALID');
+    expect(found.every((i) => i.severity === 'error' && i.tier === 'listing' && i.path === 'src/beyondplay.config.ts')).toBe(true);
+    const text = found.map((i) => i.message).join('\n');
+    for (const part of ["'Bad Id' needs an id", "the id 'ok-item' is used twice", "'no-name' needs a name", "'cheap' has the price 49", "'dear' has the price 2001", "'half' has the price 99.5", "'far' has the picture", "'gone' names the picture assets/items/missing.png, which is not in public/", "'long' needs a name"]) expect(text).toContain(part);
+    expect(found).toHaveLength(9);
+    expect(r.facts.storeItems).toEqual(['ok-item']);
+  });
+
+  it('counts more than 30 items', async () => {
+    const config = join(dir, 'src/beyondplay.config.ts');
+    const items = Array.from({ length: 31 }, (_, n) => `{ id: 'item-${n}', name: 'Item ${n}', price: 100 }`);
+    writeFileSync(config, "import { defineStore } from './beyondplay-store';\n" + readFileSync(config, 'utf8') + `\ndefineStore({ items: [${items.join(', ')}] });\n`);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_STORE_ITEMS_INVALID').message).toContain('31 items; a game offers at most 30');
+  });
+
+  it('keeps the store out of the simulation, and payments and paid draws out of the game', async () => {
+    append(join(dir, 'src/game.ts'), "import { owns } from './beyondplay-store';\nexport const fast = owns('boots') ? 2 : 1;");
+    append(join(dir, 'src/App.tsx'), "const price = 'Only $0.99';\nconst box = 'Open a loot box';");
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_STORE_IN_SIMULATION')).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/game.ts' });
+    expect(issue(r, 'GAME_OWN_PAYMENT')).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/App.tsx' });
+    expect(issue(r, 'GAME_STORE_RANDOM')).toMatchObject({ severity: 'warning', tier: 'review', path: 'src/App.tsx' });
+  });
+
+  it('does not take ordinary code for a payment or a paid draw', async () => {
+    append(join(dir, 'src/App.tsx'), "const label = `${score}.00`;\nconst swap = 'a-b'.replace(/(a)-(b)/, '$2-$1');\nconst chest = 'A mystery chest appears';\n// Stripe is never used here\nconst stripes = 12;");
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_OWN_PAYMENT');
+    // A chest that play gives away is the game's own business where nothing is sold.
+    expect(codes(r)).not.toContain('GAME_STORE_RANDOM');
+  });
+
+  it('importing the save helper is using player.save: it must be declared, and the helper may not be edited', async () => {
+    append(join(dir, 'src/App.tsx'), "import { loadSave, writeSave } from './beyondplay-save';\nvoid loadSave({ gems: 0 }).then((s) => writeSave(s));");
+    let r = await checkGame(dir, { template: TEMPLATE });
+    expect(r.facts.uses).toEqual(['player.save', 'share']);
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED')).toMatchObject({ severity: 'error', tier: 'listing', path: 'src/App.tsx' });
+    expect(issue(r, 'GAME_CAPABILITY_UNDECLARED').message).toContain('player.save');
+    const config = join(dir, 'src/beyondplay.config.ts');
+    writeFileSync(config, readFileSync(config, 'utf8').replace("uses: ['share']", "uses: ['share', 'player.save']"));
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNKNOWN');
+    append(join(dir, 'src/beyondplay-save.ts'), 'export const mine = 1;');
+    r = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(r, 'GAME_TEMPLATE_FILE_MODIFIED')).toMatchObject({ severity: 'error', path: 'src/beyondplay-save.ts' });
   });
 
   it('a config without uses still passes when the game requests nothing; skipConfig checks only the names', async () => {
@@ -235,6 +421,20 @@ describe('beyondplay-check game', () => {
     writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share']"));
     const none = await checkGame(dir, { template: TEMPLATE });
     expect(issue(none, 'GAME_CAPABILITY_UNDECLARED').message).toContain("declare the collection: uses: ['player.items:cobi']");
+  });
+
+  const AVATAR_REQUEST = "const me = await request('player.avatar', { kit: 'ape' }).catch(() => null);";
+
+  it('a declared kit satisfies request(\'player.avatar\'); a bare player.avatar declares none', async () => {
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share', 'player.avatar:ape']"));
+    append(join(dir, 'src/App.tsx'), AVATAR_REQUEST);
+    const r = await checkGame(dir, { template: TEMPLATE });
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNDECLARED');
+    expect(codes(r)).not.toContain('GAME_CAPABILITY_UNKNOWN');
+    expect(r.facts.uses).toEqual(['player.avatar:ape', 'share']);
+    writeFileSync(join(dir, 'src/beyondplay.config.ts'), configWithUses("['share', 'player.avatar']"));
+    const bare = await checkGame(dir, { template: TEMPLATE });
+    expect(issue(bare, 'GAME_CAPABILITY_UNDECLARED').message).toContain("declare the kit: uses: ['player.avatar:ape']");
   });
 
   it('a collection slug is checked for shape only; a colon on another capability is unknown', async () => {

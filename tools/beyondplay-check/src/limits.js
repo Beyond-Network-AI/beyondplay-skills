@@ -11,8 +11,10 @@ export const GAME_SOURCE = { maxFiles: 1500, maxTotalBytes: 50 * MB, maxFileByte
 /** The published bundle (dist/), as the arcade's extractor enforces it. */
 export const GAME_BUNDLE = { maxFiles: 500, maxTotalBytes: 100 * MB, maxFileBytes: 10 * MB, docs: `${DESIGN} (published bundle)` };
 
-/** Above this a published game gets a listing-tier warning (GAME_PUBLISHED_WEIGHT_HEAVY): slow to open on a phone, and the feed preloads neighbours. */
-export const GAME_PUBLISHED_WEIGHT_WARN = { maxBytes: 25 * MB, docs: `${DESIGN} (published weight, listing tier)` };
+/** Above this a published game gets a review-tier warning (GAME_PUBLISHED_WEIGHT_HEAVY): the reviewer sees the size and the largest files; it does not block listing. */
+export const GAME_PUBLISHED_WEIGHT_WARN = { maxBytes: 25 * MB, docs: `${DESIGN} (published weight, review tier)` };
+/** Above this a published game cannot be listed (GAME_PUBLISHED_WEIGHT_TOO_HEAVY, listing tier); it still publishes unlisted up to the 100 MB hard cap. */
+export const GAME_PUBLISHED_WEIGHT_MAX = { maxBytes: 50 * MB, docs: `${DESIGN} (published weight, listing tier)` };
 
 /** What a phone downloads before the first frame: index.html plus what it references synchronously. */
 export const GAME_INITIAL_DOWNLOAD = { maxBytes: 20 * MB, docs: `${DESIGN} (initial download, phones)` };
@@ -20,9 +22,13 @@ export const GAME_INITIAL_DOWNLOAD = { maxBytes: 20 * MB, docs: `${DESIGN} (init
 /** The platform's target for the same set, gzipped: well under about 1 MB (confirmed 2026-10-24). */
 export const GAME_BUNDLE_GZIP_TARGET = { maxBytes: 1 * MB, docs: 'beyondplay-skills skills/beyondplay-game/references/mobile-rules.md > Performance' };
 
+/** The platform store: what a game may offer for B-Bucks. The platform enforces the same numbers at publish and leaves out an item that breaks one. */
+export const GAME_STORE = { maxItems: 30, minPrice: 50, maxPrice: 2000, idPattern: '^[a-z0-9][a-z0-9-]{1,39}$', maxName: 40, maxBlurb: 120, imagePattern: '^/?\\w[\\w./-]*\\.(png|webp|jpg|jpeg)$', docs: `${DESIGN} (store)` };
+
 export const DOCS = {
   contract: 'beyondplay-skills skills/beyondplay-game/references/contract.md',
   capabilities: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 9. Capabilities',
+  store: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 5f. The store',
   playerItems: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 9. Capabilities > Player items; docs/player-items.md',
   testHook: 'beyondplay-skills skills/beyondplay-game/references/contract.md > 6. The test hook',
   mobile: 'beyondplay-skills skills/beyondplay-game/references/mobile-rules.md',

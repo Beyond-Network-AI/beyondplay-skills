@@ -145,7 +145,8 @@ Human rejections seen so far:
 - Cluttered HUD text; a character picker where nobody chooses.
 - Game over reported on the crash frame in a swipe game, so the reflex swipe
   pages the feed and the player loses the game.
-- Earnings or purchase language inside the game.
+- Earnings language inside the game, a price in money, a payment screen, or a
+  purchase that does not go through the platform's store (contract section 5f).
 - Audio or art with no source and licence in `CREDITS.md`, or under a licence
   that excludes games or monetised use.
 

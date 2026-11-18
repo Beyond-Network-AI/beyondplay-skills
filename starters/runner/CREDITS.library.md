@@ -1,0 +1,7 @@
+- 512 Sound Effects (8-bit style) by SubspaceAudio (CC0-1.0), https://opengameart.org/content/512-sound-effects-8-bit-style [library: sfx-core/coin/sfx-coin-cluster2]
+- 8-BIT Jump #1 by jalastram (CC0-1.0), https://opengameart.org/content/8-bit-jump-1 [library: sfx-core/jump/sfx-jump-38]
+- 8-BIT Jump #1 by jalastram (CC0-1.0), https://opengameart.org/content/8-bit-jump-1 [library: sfx-core/jump/sfx-jump-04]
+- 512 Sound Effects (8-bit style) by SubspaceAudio (CC0-1.0), https://opengameart.org/content/512-sound-effects-8-bit-style [library: sfx-core/hit/sfx-sounds-impact10]
+- 512 Sound Effects (8-bit style) by SubspaceAudio (CC0-1.0), https://opengameart.org/content/512-sound-effects-8-bit-style [library: sfx-core/lose/sfx-sounds-error10]
+- Win Jingle by Fupi (CC0-1.0), https://opengameart.org/content/win-jingle [library: music-core/stinger/win-jingle]
+- 5 Chiptunes (Action) by SubspaceAudio (CC0-1.0), https://opengameart.org/content/5-chiptunes-action [library: music-core/loop/chase-level-2]

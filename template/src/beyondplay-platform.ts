@@ -26,12 +26,27 @@
 //   player.stats     { best, plays, lastPlayedAt } for this game, or null
 //   player.friends   [{ displayName, avatar, best }] for friends who played this game, or null
 //
+// Phase 3:
+//   player.save      the player's saved progress in this game: one JSON value of at most 16 KB,
+//                    private to that player, null when signed out. Use src/beyondplay-save.ts
+//                    (loadSave, writeSave), which also keeps a copy on the device; declare it:
+//                    uses: ['player.save']
+//   player.avatar    the player's avatar in one declared kit: { kit, id, look, source, model }, the
+//                    same look in every game (the player chooses it in the app), answered signed
+//                    out too with the platform's pick; declare the kit: uses: ['player.avatar:ape']
+//
+// Phase 4:
+//   store            the game's own items for B-Bucks (cosmetics only): what is on sale, what this
+//                    player owns, and the platform's purchase sheet. Use src/beyondplay-store.ts
+//                    (storeItems, owns, buy); declare the items with its defineStore in the
+//                    config, which declares the store for you.
+//
 // The one rule for items: they change how a run looks and sounds, never how it
 // plays. A trait may pick the model, a trail, a sound, a greeting, the name on
 // the end card; nothing the simulation reads comes from an item or a trait.
 // Read items in src/App.tsx, never in src/game.ts.
 
-export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share' | 'player.items' | 'player.stats' | 'player.friends';
+export type CapabilityName = 'capabilities' | 'host' | 'player.profile' | 'share' | 'player.items' | 'player.stats' | 'player.friends' | 'player.save' | 'player.avatar' | 'store';
 
 export interface HostInfo {
   surface: 'feed' | 'page' | 'app' | 'telegram' | 'desktop' | 'unknown';
@@ -133,6 +148,66 @@ export interface PlayerFriend {
   best: number | null;
 }
 
+/** The player's saved progress in this game: the value the game last wrote and when (null and null when nothing is saved). */
+export interface PlayerSave {
+  data: unknown | null;
+  updatedAt: string | null;
+}
+/** Read the save, or write a new value (JSON, at most 16 KB). */
+export type PlayerSaveParams = { op: 'get' } | { op: 'set'; data: unknown };
+/** The answer to a write. */
+export type PlayerSaveWrite = { ok: true; updatedAt: string } | { ok: false; reason: 'too_large' | 'invalid' | 'unavailable'; limit?: number };
+
+/** One item of the game's store, as the platform answers it. Look and sound only. */
+export interface StoreItem {
+  /** The id the game gave the item in defineStore. */
+  id: string;
+  name: string;
+  blurb: string | null;
+  /** The item's picture, served from the game. */
+  image: string | null;
+  /** The price in B-Bucks. */
+  price: number;
+  /** False while the item waits for review, was withdrawn, or the store is not open for this game. */
+  onSale: boolean;
+  /** True when this player owns it, on every device. Always false signed out. */
+  owned: boolean;
+}
+/** List the game's items, or ask the platform to sell one (it opens its own sheet). With `wait`,
+ *  the host answers { outcome: 'pending' } while its sheet is still open and the caller asks
+ *  again; src/beyondplay-store.ts does this, so buy through it. */
+export type StoreParams = { op: 'items' } | { op: 'buy'; item: string; wait?: boolean };
+/** The answer to a buy that ended with the player owning the item. */
+export interface StoreBuyResult {
+  outcome: 'bought' | 'owned';
+}
+
+export interface PlayerAvatarParams {
+  /** The kit, the one declared in uses as 'player.avatar:<kit>' ('ape'). */
+  kit: string;
+}
+
+/** The player's avatar: one look, the same in every game. Look only: never how a run plays. */
+export interface PlayerAvatar {
+  kit: string;
+  /** The library character to show ('ape-07'); src/beyondplay-characters.ts loadCharacter(id) loads it with its moves. */
+  id: string;
+  look: { preset: string };
+  /** own: the player chose it; default: the platform picked it for this player or device. */
+  source: 'own' | 'default';
+  /** One baked file on the asset host, or null when the catalogue does not hold it yet (load the library character by id). */
+  model: {
+    kind: 'baked';
+    url: string;
+    skeleton: string | null;
+    height: number | null;
+    facing: string | null;
+    feetAt: number | null;
+    /** The library move set it plays. */
+    moves: string | null;
+  } | null;
+}
+
 export interface CapabilityParams {
   capabilities: undefined;
   host: undefined;
@@ -141,6 +216,9 @@ export interface CapabilityParams {
   'player.items': PlayerItemsParams;
   'player.stats': undefined;
   'player.friends': undefined;
+  'player.save': PlayerSaveParams;
+  'player.avatar': PlayerAvatarParams;
+  store: StoreParams;
 }
 
 export interface CapabilityResults {
@@ -152,6 +230,12 @@ export interface CapabilityResults {
   'player.items': PlayerItem[] | null;
   'player.stats': PlayerStats | null;
   'player.friends': PlayerFriend[] | null;
+  /** A PlayerSave for a read, a PlayerSaveWrite for a write, null when signed out. */
+  'player.save': PlayerSave | PlayerSaveWrite | null;
+  /** The player's avatar in the declared kit; never null from a host that offers it (signed out: the platform's pick). */
+  'player.avatar': PlayerAvatar;
+  /** StoreItem[] for items; a StoreBuyResult for a buy (it rejects with cancelled when the player closes the sheet), or { outcome: 'pending' } to a buy with `wait` while the sheet is open. */
+  store: StoreItem[] | StoreBuyResult | { outcome: 'pending' };
 }
 
 /** Why a request was not answered with a result. */
@@ -198,6 +282,15 @@ export function onCapabilities(cb: (names: string[]) => void): () => void {
   const api = bridge();
   if (!api || typeof api.onCapabilities !== 'function') return () => {};
   return api.onCapabilities(cb) as () => void;
+}
+
+/** Called with the player's new look when it changes while the game runs (they saved another avatar in the locker
+ *  and came back): `avatar` is a fresh player.avatar answer, `params` what the game asked with. Older hosts never
+ *  call it. Returns an unsubscribe function. */
+export function onAvatarChange(cb: (avatar: PlayerAvatar | null, params: PlayerAvatarParams) => void): () => void {
+  const api = bridge();
+  if (!api || typeof api.onAvatarChange !== 'function') return () => {};
+  return api.onAvatarChange(cb) as () => void;
 }
 
 /** True when the error is a CapabilityError with the given code. */

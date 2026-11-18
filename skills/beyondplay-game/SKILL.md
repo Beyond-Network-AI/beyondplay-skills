@@ -29,8 +29,10 @@ Facts that shape every decision:
 - Duels: the platform hands both players the same seed. Same seed plus same
   inputs must reproduce the identical run.
 - Platform-owned files in the folder are never edited: `index.html` (except
-  `<title>`), `src/main.tsx`, `src/beyondplay-kit.ts`. The hosted build
-  installs the platform's own copies anyway; the validator fails a changed one.
+  `<title>`), `src/main.tsx`, `src/beyondplay-kit.ts`, `src/cobi-kit.ts` and the
+  `src/beyondplay-*` helpers (audio, hud, anim, characters, save, store). The
+  hosted build installs the platform's own copies anyway; the validator fails a
+  changed one.
 - Nothing is published from your machine. The creator MCP uploads the source,
   builds and checks it on the platform, publishes it unlisted and submits it
   for review. See `references/submit.md`.
@@ -72,6 +74,7 @@ Node 20 or newer. The checks on a machine without that browser can point
 
 ```bash
 npm run new-game -- <slug> "Display Name"      # slug: ^[a-z0-9][a-z0-9-]{2,40}$
+npm run new-game -- <slug> "Display Name" --starter runner   # or start from a genre starter (contract section 5d)
 ```
 
 The scaffold copies the template, sets `<title>`, writes
@@ -238,9 +241,14 @@ Breaking any of these ships a broken game or a rejected one.
   which opens the platform's sheet. Declare every capability the game requests
   in `uses` on `defineSoloGame`, and show such a control only when
   `can(name)` is true (`references/contract.md` section 9).
-- Rewards, currencies and unlocks inside a game are cosmetic and local; no
-  purchase, earnings or token language. Seasons, prizes and tokens are the
-  platform's: ask for them, never build them in.
+- Rewards, currencies and unlocks inside a game are cosmetic and local; a
+  game's own currency (gems, coins) is earned by playing and never sold, and
+  there is no earnings or token language. Seasons, prizes and tokens are the
+  platform's.
+- Selling is the platform's too: a game may offer cosmetic items for B-Bucks
+  through the platform's store (`defineStore`, `src/beyondplay-store.ts`,
+  contract section 5f). Looks and sounds only, no prices in money, no payment
+  screens, no loot boxes, and the game stays fully playable without buying.
 - No wallet, token or NFT gating. Holding an asset unlocks nothing; wallet
   operations belong to the host shell. Character traits are cosmetic only.
 - The player's own items come through the platform, never a wallet: declare
@@ -301,8 +309,11 @@ Breaking any of these ships a broken game or a rejected one.
 - [ ] Boots into play; `bp_ready` fires once after the first draw; no how-to text; idle survives 12 s
 - [ ] Portrait screenshots inspected; text readable at phone size; canvas fills the viewport
 - [ ] If the game declares `any`: screenshots at 1280 x 720 inspected too
+- [ ] The score, timer, lives, buttons and the end card come from the HUD kit (`src/beyondplay-hud.tsx`, contract section 5b); status on top, controls at the bottom, the middle empty
 - [ ] No external requests in the network log beyond the platform and the template's font
 - [ ] No brand names or third-party IP; fan disclaimer present where required; no emoji
+- [ ] The asset library was searched first (`search_assets`, `add_asset` on the creator MCP); the game has a sound set and a music loop, played through `src/beyondplay-audio.ts`
+- [ ] 3D characters and their moves come from the library (`src/beyondplay-characters.ts`, contract section 5c), loaded from the asset host; no model or clip of the library is copied into the game
 - [ ] Every asset and track is owned, CC0 or commercially licensed, and named in `CREDITS.md`; audio unlocks on a gesture
 - [ ] `assets/icon.png` rendered (and `assets/banner.jpg` if you want one)
 - [ ] `publish.config.json` complete; `visibility` is `unlisted`

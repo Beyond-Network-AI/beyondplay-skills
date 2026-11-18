@@ -16,7 +16,14 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/main.tsx` | platform | `window.BeyondPlay` shell, parent auth listener, WebKit image hardening, React mount of `./App`. |
 | `src/beyondplay-kit.ts` | platform | `defineChallenge`, `defineSoloGame`, `declareUses`, `defineDisplay`, `DEFAULT_DISPLAY`, `getMatch`, `onMatchResult`, `buildManifest`. |
 | `src/beyondplay-platform.ts` | platform | `request`, `capabilities`, `can`, `onCapabilities`: the platform capabilities (section 9). Import it; do not edit it. |
-| `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it. |
+| `src/haptics.ts` | platform | `haptic(kind)` helper. Import it; do not edit it (an edited copy is scanned as the game's own code). |
+| `src/beyondplay-audio.ts` | platform | `loadSound`, `play`, `startMusic`, `setMuted`: sound effects and a music loop (section 5a). Import it; do not edit it. |
+| `src/beyondplay-hud.tsx` | platform | `Hud`, `HudRow`, `Stat`, `Timer`, `Hearts`, `Meter`, `Callout`, `HudButton`, `Stick`, `EndCard`, `setHudTheme`: what shows over the play (section 5b). Import it; do not edit it. |
+| `src/cobi-kit.ts` | platform | `CobiKit`: builds the shared bull from the kit on the asset host (section 9). Import it; do not edit it. |
+| `src/beyondplay-anim.ts` | platform | `loadClips`, `Animator`: clip packs for the shared bull kit and cross-faded animation states (section 5c). Import it; do not edit it. |
+| `src/beyondplay-characters.ts` | platform | `loadCharacter`, `loadClip`, `clipsFor`, `loadDance`: the library's rigged characters and their moves, from the asset host (section 5c). Import it; do not edit it. |
+| `src/beyondplay-avatar.ts` | platform | `loadPlayerAvatar`, `onPlayerAvatarChange`, `loadAvatar`, `DEFAULT_AVATAR`: the player's avatar in any kit the game declared, loaded with its moves (section 5c). Import it; do not edit it. |
+| `src/beyondplay-save.ts` | platform | `loadSave`, `writeSave`, `flushSave`: progress that follows the player (section 5e). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
 | `tsconfig.json`, `vite.config.ts` | platform | Strict TypeScript; shared Vite settings. |
@@ -117,9 +124,23 @@ defineChallenge({ metricLabel: 'Time', lowerIsBetter: true, seed: false,
                   instanceKind: 'static', minValue: 1, maxValue: 600 });
 ```
 
-Set `maxValue` above any honest run but below what a cheat would post; the
-shipped games use 8000 (ten baskets), 100000 (endless climb) and 200000
-(long runner).
+Set `maxValue` just above the best an honest run can reach, worked out from the game's own numbers
+(run length, top speed, points per pickup), and change it whenever they change; the shipped games
+use 8000 (ten baskets) and 4000 (a sixty second runner). A challenge with no bound on its winning
+side is `GAME_SCORE_UNBOUNDED` (review tier): the server rejects a value past the bound, so a bug
+that lets a score run free never reaches the board.
+
+**A run always ends, and no score is free** (`GAME_RUN_NEVER_ENDS`, review tier). Two ways a game
+breaks this, both seen in a shipped runner whose best run reached 109,000 for nothing:
+
+- The content runs out. A course planned once to a fixed length ends somewhere, and past its end
+  there is nothing to hit. End the run by the clock, or plan the content a chunk at a time ahead of
+  the player, each chunk its own stream of the seed, so there is always more and both duelists
+  still get the same course.
+- The difficulty goes flat. In an endless game keep one thing rising for as long as a run can last
+  (the speed, how little room an obstacle leaves) until nobody gets through.
+
+Try the game with a driver that never misses: its run must still end.
 
 ## 3. `dist/beyondplay.json`
 
@@ -201,7 +222,9 @@ Conformance also fails when `instanceKind` is `random` and `needsSeed` is
 `false`, and when the file on disk differs from what the config declares.
 
 A config that declares `uses` adds `"uses": ["share"]` to either shape; a
-config that declares nothing omits the field.
+config that declares nothing omits the field. A config that calls `defineStore`
+adds `"store": { "items": [{ "id", "name", "blurb", "image", "price" }] }` and
+`"store"` to `uses` (section 5f).
 
 ## 4. The runtime SDK: `window.BeyondPlay`
 
@@ -258,6 +281,267 @@ throttle (at least 50 ms spacing plus a per-second burst cap); a dropped
 haptic is correct behaviour. Never call `navigator.vibrate` or a Telegram
 haptics API directly.
 
+## 5a. Sound, music and the asset library
+
+A game should have sound: a small set of effects (tap, hit, pickup, win, lose) and one music loop.
+Take them from the platform's asset library before making your own:
+
+- On the creator MCP, `search_assets` finds ready, licensed parts (sound effects, music loops by
+  mood, sprites, tiles, UI pieces, the bull kit, rigged characters and their moves) and `add_asset`
+  gives, for one result, the file's address, where it goes in the game
+  (`public/assets/library/<pack>/...`), how to use it and the exact line for `CREDITS.md`. Search
+  first; draw, generate or record only when nothing fits.
+- Small files (art, sound, music) are copied into the game. 3D (the bull kit, the characters and
+  their moves) is loaded from `assets.beyondplay.xyz` at run time and never copied, so the game stays
+  inside the weight limits: `add_asset` answers with the address, a loader snippet and, for a move,
+  the characters it plays on.
+- Every file under `public/assets/library/` needs its line in `CREDITS.md`, tagged
+  `[library: <id>]` (`GAME_LIBRARY_CREDIT_MISSING`, listing tier). Assets that are not from the
+  library keep the existing rule: owned, CC0 or commercially licensed, and named in `CREDITS.md`.
+
+Play audio through `src/beyondplay-audio.ts`, which keeps the rules for you:
+
+```ts
+import { loadSounds, play, startMusic, setMuted } from './beyondplay-audio';
+
+// after the first frame
+loadSounds({ coin: '/assets/library/sfx-core/coin/coin-01.ogg', hit: '/assets/library/sfx-core/hit/impact-01.ogg' });
+startMusic('/assets/library/music-core/loop/arcade-level-1.ogg', { volume: 0.4 });
+
+play('coin');            // on the event, in src/App.tsx, never in src/game.ts
+setMuted(true);          // the game's mute control
+```
+
+Nothing sounds before the player's first touch (music waits for it); audio loads after the first
+frame and never blocks play; the game goes quiet when its card scrolls away; the checks run silent
+under `?bp_test=1`. Budgets: a sound set under 1 MB, a music loop under 1.5 MB. Sound is look and
+feel only: the simulation never reads it.
+
+## 5b. The HUD kit
+
+Build everything that shows over the play from `src/beyondplay-hud.tsx`: it is sized for a thumb,
+readable over a dark or a bright scene, clear of the notch and the home bar, and it adapts to a
+large screen and a keyboard without any work in the game.
+
+```tsx
+import { Hud, HudRow, HudGroup, Stat, Timer, Hearts, Meter, Callout, HudButton, Stick, EndCard, setHudTheme } from './beyondplay-hud';
+
+<Hud>
+  <HudRow at="top"
+    left={<><Stat value={score} large /><Hearts value={lives} max={4} /></>}
+    center={<Timer seconds={left} />}
+    right={<><HudButton icon={muted ? 'mute' : 'sound'} label="Sound" onPress={toggleMute} /><Stat icon="gem" value={gems} /></>}
+    wide={<Meter value={xp} max={xpToNext} label="Level 1" />} />
+  <Callout text={event} />
+  <HudRow at="bottom"
+    left={<Stick onMove={(x, y) => input.set(x, y)} keys="wasd" />}
+    right={<HudGroup gap={12}>
+      <HudButton icon="shield" label="Shield" size={52} cooldown={shieldCd} keyHint="E" onPress={shield} />
+      <HudButton icon="dash" label="Dash" size={64} lit keyHint="Space" onPress={dash} />
+    </HudGroup>} />
+</Hud>
+{over && <EndCard score={over.score} best={best} lines={['52 streak']} onPlayAgain={restart} onShare={canShare ? share : undefined} />}
+```
+
+The layout, on every screen:
+
+- **Top row is status** (what the player has): the score top left, time top centre, sound top
+  right. At most five pieces, and one line across the full width (`wide`) for a level or boss bar.
+- **Bottom row is controls** (what the player does): movement under the left thumb, one 64 px
+  action and at most one 52 px second action under the right. A one-thumb game needs no controls
+  at all: the whole screen is the button.
+- **The middle stays empty**, except a `Callout` of one or two words for a moment.
+- **One lit element at a time** (`lit`, or `tone="lit"`): the thing that matters right now.
+- Nothing in the kit starts, pauses or explains a game, and the game adds none of those.
+- A control fires on touch-down and never moves the player itself: it records an input the
+  engine reads at its next step.
+
+On a desktop and in full screen (where the platform plays the game on a landscape stage):
+
+- The HUD **grows with the stage**, from 1 at phone size to 1.5 at 720 px and taller, and stays
+  in the corners; it never stretches across a wide screen and nothing is re-laid out by the game.
+- **Keys replace thumbs.** A `HudButton` with `keyHint` shows its key cap while the player uses a
+  keyboard, and a `Stick` with `keys` gives way to its keys, which fade after the first press. A
+  touch brings the stick back. The game reads the keyboard itself and declares the keys.
+- **The host owns the frame**: Full screen, Esc, the key hint line under the title, and the
+  result card with Play again (`R`) on the desktop. A game draws no full-screen button, no title
+  and no key instructions of its own.
+- Keep the play itself inside the centre 4:3 of a wide stage, so nothing the player must see sits
+  under the corners' HUD at any aspect from 9:19.5 to 21:9.
+
+`setHudTheme({ lit: '#35e0c8' })` changes the kit's colours for one game (ink, lit, open, danger,
+smoke, line, font); call it once before the first render. The file itself is platform-owned: an
+edited copy is `GAME_TEMPLATE_FILE_MODIFIED`. A game that draws its own HUD is noted for the
+reviewer (`GAME_HUD_NOT_KIT`, review tier). Ask the platform for a piece the kit lacks.
+
+## 5c. Character animation
+
+A character that snaps from one pose to the next reads as cheap. Play the shared bull (the COBI kit,
+`src/cobi-kit.ts`) through `src/beyondplay-anim.ts`, which blends every change of state:
+
+```ts
+import { Animator, loadClips } from './beyondplay-anim';
+
+const clips = await loadClips('runner');           // a platform pack, or the address of a .glb of your own
+const anim = new Animator(bull.root, clips, {
+  run:   { clip: 'run' },
+  jump:  { clip: 'run-jump', loop: false },        // holds its last pose until the game says it landed
+  slide: { clip: 'run-slide', loop: false, then: 'run' },
+  hit:   { clip: 'hit-react', loop: false, then: 'run' },
+  down:  { clip: 'knockout', loop: false },
+});
+anim.play('run');
+anim.play('jump');                                 // on the engine's event, in the shell
+anim.setSpeed('run', speed / 8.5); anim.update(dt); // every frame, on the render clock
+```
+
+- Every change of state cross-fades (0.18 s unless the state says otherwise). A one-shot state
+  (`loop: false`) holds its last pose, or moves on to its `then` state by itself.
+- Clips play in place: the engine alone decides where the character is. Animation is look only:
+  it runs on the render clock and the simulation never reads it.
+- Give every character at least: a loop for moving, one for each thing the player does (jump,
+  slide, attack), a reaction to being hit, an end for losing and one for winning.
+- The packs are loaded from the asset host at run time, after the first frame, and are never
+  copied into the game: `runner` (idle-neutral, run, run-jump, run-slide, hit-react, knockout,
+  victory; 479 KB). Draw a stand-in until the character arrives; never hold the first frame for it.
+
+### Characters and moves from the library
+
+The library holds rigged characters and a set of moves for each, on the asset host; search it first
+(`search_assets` with `kind: "character"` or `kind: "animation"`, and `playsOn` for one character's
+moves). `src/beyondplay-characters.ts` loads them, and the `Animator` above plays them:
+
+```ts
+import { clipsFor, loadCharacter } from './beyondplay-characters';
+import { Animator } from './beyondplay-anim';
+
+const ape = await loadCharacter('ape');            // 1.75 m, feet at y = 0, faces +Z
+scene.add(ape.root);
+const clips = await clipsFor(ape, ['idle', 'walk', 'sit', 'wave', 'fall', 'dance-ymca']);
+const anim = new Animator(ape.root, clips, {
+  idle: { clip: 'idle' },
+  walk: { clip: 'walk' },
+  wave: { clip: 'wave', loop: false, then: 'idle' },
+});
+// the player's own avatar, in any kit the game declared (uses: ['player.avatar:beyonder', 'player.avatar:bull', ...]):
+//   const me = await loadPlayerAvatar();  scene.add(me.character.root);  const myClips = await me.clips(['idle', 'walk']);
+//   onPlayerAvatarChange((next) => { /* swap me for next */ });   // src/beyondplay-avatar.ts
+// the kit bull plays the bull's moves the same way:
+const bullClips = await clipsFor({ id: 'bull', root: bull.root }, ['idle', 'sit', 'wave']);
+```
+
+- Characters: `ape`, `beyonder-pink`, `beyonder-green`, and `bull` (its body is the kit, `src/cobi-kit.ts`).
+- Moves, the same names for every character: idle, walk, run, jump, sit, sit-down, stand-up, fall,
+  land, glide, wave, point, clap, cheer. Each character has its own file for each; a move plays on the
+  character it was made for. Dances that play on any of them: backflip, victory, dance-hiphop,
+  dance-samba, dance-slide, dance-ymca.
+- Moves play in place. The two sit transitions travel: the distance is in the move's record
+  (`meta.travel`), so the game can move the character with it.
+- The loader finds the files through the library's index, so a character or move added to the library
+  is there for every game with no change to the template.
+
+## 5d. Genre starters
+
+`npm run new-game -- <slug> "Name" --starter runner` lays a genre starter over the template: a
+complete game of that genre that passes the ladder as scaffolded, with its engine
+(`src/game.ts`), its scene (`src/scene.ts`), the shell, the check driver, a sound set and a music
+loop from the asset library (credited in `CREDITS.md`), the HUD kit and the animated bull. Start
+from the starter that is nearest your idea and change it; keep its shape.
+
+- `runner`: three lanes, obstacles to dodge, jump or slide under, coins, sixty seconds or three
+  hits. three.js, 15 draw calls, about 28,000 triangles with the bull.
+
+## 5e. Saved progress
+
+A game's progress follows the player: unlocks, settings, a collection, how far they got. Save it
+through `src/beyondplay-save.ts` and declare `player.save`:
+
+```ts
+import { loadSave, writeSave, flushSave } from './beyondplay-save';
+
+const save = await loadSave({ gems: 0, unlocked: [] as string[] });   // after the first frame
+save.gems += 5;
+writeSave(save);        // whenever it changes: the device at once, the platform shortly after
+flushSave();            // at the end of a run
+```
+
+```ts
+export const game = defineSoloGame({ challenge, uses: ['share', 'player.save'] });
+```
+
+- For a signed-in player the platform keeps the save, so it is there on their next phone, in the
+  app and on the web. A copy is always kept on the device, which is all a signed-out player has;
+  on load the newer of the two wins.
+- One JSON value of at most 16 KB. A field added later gets its default from the fallback you pass.
+- Never hold play for it: load after the first frame, and treat no answer as "nothing saved".
+- A save holds no personal data, and nobody but its player ever reads it.
+- **In a duel a run plays the same for both players whatever either has saved**
+  (`GAME_SAVE_CHANGES_A_DUEL`, review tier). What a save unlocks is looks, sounds and solo play;
+  when `getMatch()` answers a match, start both players from the same loadout.
+- Importing the helper without declaring `player.save` is `GAME_CAPABILITY_UNDECLARED`: the
+  platform would answer denied and the save would stay on the device.
+
+## 5f. The store
+
+A game may offer cosmetic items for B-Bucks, the platform's currency (100 B-Bucks is about one US
+dollar). The platform sells them: it shows its own sheet with the item, the price and the
+player's balance, takes the B-Bucks when the player confirms, remembers who owns what on every
+device, and pays the creator 80% of the B-Bucks spent on their items. The game declares the items,
+shows what they look like and draws them for a player who owns them.
+
+Declare the items in the config (at most 30, each from 50 to 2,000 B-Bucks). Declaring a store
+declares the `store` capability for you:
+
+```ts
+import { defineStore } from './beyondplay-store';
+
+defineStore({ items: [
+  { id: 'trail-neon', name: 'Neon trail', blurb: 'A glowing trail behind your runner.', image: 'assets/items/trail-neon.png', price: 150 },
+  { id: 'skin-gold', name: 'Gold skin', image: 'assets/items/skin-gold.png', price: 400 },
+] });
+```
+
+Use them through `src/beyondplay-store.ts`:
+
+```ts
+import { storeItems, owns, buy } from './beyondplay-store';
+import { Price } from './beyondplay-hud';
+
+const items = await storeItems();                    // after the first frame; [] where no host answers
+if (owns('trail-neon')) renderer.setTrail('neon');   // in src/App.tsx, never in src/game.ts
+
+// on a locked item, on the end card or behind a small control (never before the first run)
+<Price amount={150} label="Neon trail" onPress={() => buy('trail-neon').then(() => renderer.setTrail('neon')).catch(() => {})} />
+```
+
+- `storeItems()` answers each declared item with `onSale` and `owned`. An item is on sale once a
+  reviewer has approved it and the game; until then show it without a price, or not at all.
+- `buy(id)` opens the platform's sheet and resolves once the player owns the item. A rejection is
+  normal (the player closed the sheet, is signed out, or this host does not sell): catch it.
+  Always buy through `buy(id)`, never a bare `request('store', ...)`: a player takes their time in
+  the sheet, and the helper keeps asking the host while it is open (a bare request gives up after
+  ten seconds and never hears that the player bought).
+- The host may show its own game-over card over the game's end card. Offer items where the player
+  will see them: on the end card and, if the game has room for one, behind a small control.
+- A picture is a png, webp or jpg under `public/`, showing the item as it looks in the game.
+- A changed name, picture or price is reviewed again, and the item is off sale until it is; an
+  item the build no longer declares stops selling, and the players who own it keep it.
+- A game never sees a balance and cannot confirm a purchase.
+
+The rules a store is held to:
+
+| Rule | Code | Tier |
+|---|---|---|
+| Items change how a run looks and sounds, never how it plays. `owns()` is read in `src/App.tsx`; the store helper never appears in `src/game.ts`. | `GAME_STORE_IN_SIMULATION` | listing |
+| Every purchase goes through the platform's sheet: no price in money, no payment screen, no payment provider. | `GAME_OWN_PAYMENT` | listing |
+| The declared items keep the limits above. | `GAME_STORE_ITEMS_INVALID` | listing |
+| A player always sees exactly what they buy: no loot boxes, mystery items or paid draws, no item that expires, no countdown on a purchase. | `GAME_STORE_RANDOM` | review |
+| The game is fully playable without buying: no item unlocks a mode, a level, a board, a life or an advantage. | `GAME_STORE_GATES_PLAY` | review |
+| An item's name and picture show what the player gets. | `GAME_STORE_ITEM_MISLEADING` | review |
+
+A game's own currency (gems, coins) is earned by playing and never sold. Nothing is sold in a
+test run: with no host, `storeItems()` answers `[]`.
+
 ## 6. The test hook
 
 Required when `?bp_test=1` is present:
@@ -305,7 +589,7 @@ the driver's `stepsPerSecond`, default 60).
 | Measure | Budget | Code (tier) |
 |---|---|---|
 | Time to first frame: `bp_ready` at the parent or the first drawn canvas, from navigation | 5 s | `GAME_SLOW_FIRST_FRAME` (listing) |
-| 95th percentile frame time over ten seconds of driven play | 33 ms (a 30 fps floor; 60 fps is the target) | `GAME_FRAME_TIME` (listing) |
+| 95th percentile frame time over ten seconds of driven play | 33 ms (a 30 fps floor; 60 fps is the target) | `GAME_FRAME_TIME` (listing). A game that draws with WebGL is not judged on this where the check machine has no graphics card (`GAME_FRAME_TIME_NOT_JUDGED`, an info line): its budget is draw calls and triangles. |
 | Draw calls per frame, the most seen, from `__bpTest.perf()` | 60 | `GAME_DRAW_CALLS` (listing) |
 | Triangles per frame, the most seen, from `__bpTest.perf()` | 300,000 | `GAME_TRIANGLES` (listing) |
 | JavaScript heap after a minute of play | informational | `GAME_HEAP` (review, info) |
@@ -402,6 +686,9 @@ does not list.
 | `player.items` | open | `{ collection }` | `PlayerItem[]`, the player's items in the one collection the game declared; `null` when signed out, no wallet is linked, the player opted out or the game is not allowed to ask; `[]` when the wallet holds nothing in it. Declared as `player.items:<collection>` in `uses`. See Player items below. |
 | `player.stats` | open | | `{ best, plays, lastPlayedAt }` for this game, or `null` when signed out; what the leaderboard already shows. |
 | `player.friends` | open | | `[{ displayName, avatar, best }]` for friends who played this game, or `null` when signed out. No ids, no items, no lookup by player. |
+| `player.save` | open | `{ op: 'get' }` or `{ op: 'set', data }` | `{ data, updatedAt }` for a read, `{ ok, updatedAt }` for a write, or `null` when signed out. One JSON value per player per game, at most 16 KB, private to that player. Use `src/beyondplay-save.ts` (section 5e). |
+| `player.avatar` | open | `{ kit }` | `{ kit, id, look, source, model }`: the player's avatar in the kit declared as `player.avatar:<kit>` (`uses: ['player.avatar:ape']`), the same look in every game, answered signed out too with the platform's pick. `id` is the library character (`ape-07`): load it with `loadCharacter(id)` from `src/beyondplay-characters.ts`, or `model.url`. Look only. |
+| `store` | open | `{ op: 'items' }` or `{ op: 'buy', item, wait? }` | For `items`: `[{ id, name, blurb, image, price, onSale, owned }]`, the items declared with `defineStore`. For `buy`: `{ outcome: 'bought' \| 'owned' }` once the player owns the item; rejects with `cancelled` when the player closes the platform's sheet. Use `src/beyondplay-store.ts` (section 5f). |
 
 Tiers: `open` is answered without asking the player, which covers
 everything offered (phase one and, since 6 November 2026, phase two:

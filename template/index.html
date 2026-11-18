@@ -77,6 +77,7 @@
     var pending = {};
     var seq = 0;
     var listeners = [];
+    var avatarListeners = [];
     var current;
     var framed = false;
     try { framed = !!window.parent && window.parent !== window; } catch (e0) { framed = true; }
@@ -139,10 +140,15 @@
     function dispatch(data) {
       if (!data || typeof data !== 'object' || data.channel !== CHANNEL) return;
       if (data.kind === 'hello' && data.payload && Object.prototype.toString.call(data.payload.capabilities) === '[object Array]') { setCapabilities(data.payload.capabilities); return; }
-      if (data.kind === 'response' && typeof data.requestId === 'string') settle(data);
+      if (data.kind === 'response' && typeof data.requestId === 'string') { settle(data); return; }
+      if (data.kind === 'avatar_update' && data.payload && typeof data.payload === 'object') {
+        for (var a = 0; a < avatarListeners.length; a++) { try { avatarListeners[a](data.payload.avatar === undefined ? null : data.payload.avatar, data.payload.params || {}); } catch (e7) { /* a listener must not break the bridge */ } }
+      }
     }
     window.addEventListener('message', function (event) {
-      if (framed && event.source !== window.parent) return;
+      // Framed: the host page only. Not framed: the app's own events (dispatched in the page, no source window), never
+      // a message from another window (an opener) posing as the host.
+      if (framed ? event.source !== window.parent : (event.source && event.source !== window)) return;
       dispatch(event.data);
     });
     var extras = {
@@ -154,6 +160,11 @@
         listeners.push(cb);
         if (heard) { try { cb(caps.slice()); } catch (e4) { /* see above */ } }
         return function () { var i = listeners.indexOf(cb); if (i >= 0) listeners.splice(i, 1); };
+      },
+      onAvatarChange: function (cb) {
+        if (typeof cb !== 'function') return function () {};
+        avatarListeners.push(cb);
+        return function () { var i = avatarListeners.indexOf(cb); if (i >= 0) avatarListeners.splice(i, 1); };
       },
       __hostMessage: function (data) {
         if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e5) { return; } }
