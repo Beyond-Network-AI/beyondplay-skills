@@ -18,8 +18,9 @@ submission decides.
 | 3 | `npm run smoke:seed -- games/<slug>` | `DETERMINISTIC` | `SEED-FAIL:` |
 | 4 | `npm run conformance -- games/<slug>` | `CONFORMANT` | `CONFORMANCE-FAIL:` |
 | 5 | `npm run smoke:idle -- games/<slug>` | `IDLE-OK` | `IDLE-FAIL:` |
-| 6 | `npm run smoke:perf -- games/<slug>` | `PERF-OK` | `PERF-WARN:` (findings), `PERF-FAIL:` (could not measure) |
-| 7 | `npm run typecheck -- games/<slug>` | `TYPECHECK-OK` | tsc errors |
+| 6 | `npm run smoke:keys -- games/<slug>` | `KEYS-OK` | `KEYS-FAIL:` |
+| 7 | `npm run smoke:perf -- games/<slug>` | `PERF-OK` | `PERF-WARN:` (findings), `PERF-FAIL:` (could not measure) |
+| 8 | `npm run typecheck -- games/<slug>` | `TYPECHECK-OK` | tsc errors |
 
 The browser checks need Playwright's Chromium (`npm run browser`), or a
 `CHROME_PATH` pointing at any Chrome or Chromium binary. They serve
@@ -38,6 +39,13 @@ export default {
   settleMs: 800,  // optional: wait before the pixel check
   allowZero: false, // optional: true when a finished run can honestly score 0
   stepsPerSecond: 120, // optional: the engine's steps per second (1 / DT); the performance smoke replays at it (default 60)
+  keys: {         // optional: how smoke:keys presses the keys the game declares
+    setup(t) { /* after reset(): reach the state where keys act, e.g. start the round */ },
+    settle: 30,   // steps between setup and the press
+    ticks: 30,    // steps the key is held
+    verbs: { 'pick card': { skip: 'cards are only live between waves' },   // a skip needs a reason
+             jump: { press: 'ArrowUp', ticks: 10 } },                        // a Playwright key name
+  },
 };
 ```
 
@@ -46,7 +54,8 @@ be self-contained (no imports, no closures). Either may also be a source
 string to evaluate. Without a driver the checks play an idle run, which only
 runners and dodgers finish. The template ships a working driver; the
 validator warns when a game has none. `conformance` and `typecheck` need no
-driver.
+driver. `smoke:keys` reads only the driver's `keys` section (no `play`
+needed); `keys.setup` and `verbs[verb].setup` run in the page like `play`.
 
 ## 0. `check` (PASS)
 
@@ -88,7 +97,10 @@ and the emitter printed the reason in a boxed `MANIFEST EMIT FAILED` block.
 
 ## 2. `smoke:render` (RENDER-OK)
 
-Embeds the built game in an iframe (400 x 700 inside a 420 x 720 page) at
+Runs once per viewport the game's display declares (`dist/beyondplay.json` >
+`display.orientation`, `docs/display.md`): portrait 390 x 844, landscape
+1280 x 720, and both for `any`, portrait first. Each run embeds the built game
+in an iframe of that size (inside a page 20 px larger) at
 `/?bp_test=1&bp_seed=render-seed&bp_match=smoke`, then asserts in order:
 
 1. `window.__bpTest` appears within 20 s.
@@ -101,7 +113,10 @@ Embeds the built game in an iframe (400 x 700 inside a 420 x 720 page) at
    score.
 5. No page errors and no unexpected failed requests. Forgiven: `favicon`, the
    template's Google Fonts on a machine without network, and `score submit
-   failed`.
+   failed` (the list is in `scripts/smoke-driver.mjs`).
+
+Log lines carry the viewport (`[landscape 1280x720] canvas OK: ...`); the last
+line names the viewports that passed: `RENDER-OK (portrait, landscape)`.
 
 Reading a failure: `__bpTest hook never appeared` means the hook is not
 installed under `bp_test=1` or the game threw before mounting; `canvas blank
@@ -167,7 +182,39 @@ word ("again", "retry", "game over") inside the grace period fails it: the
 feed autoplays cards, and a card that dies before the viewer decides to play
 is a dead card.
 
-## 6. `smoke:perf` (PERF-OK)
+## 6. `smoke:keys` (KEYS-OK)
+
+Reads `display` from `dist/beyondplay.json`. A manifest without `display` for
+a game on the template's kit was built before `defineDisplay`: it fails
+(rebuild), as `smoke:render` does. Without `'keyboard'` in `input` it
+prints `KEYS-OK: no keyboard declared` and stops; with `'keyboard'` and no
+`keys` it fails. Otherwise it opens the game top-level (not in an iframe, so
+the document has focus) at the stage viewport (1280 x 720, or 390 x 844 for a
+portrait game) under `?bp_test=1&bp_seed=keys-seed&bp_match=smoke`, and for
+each declared verb in order:
+
+1. Skips it when the driver gives `keys.verbs[verb].skip` with a reason.
+2. Plays the same run twice from `reset()`: `setup`, `settle` steps (30),
+   `ticks` steps (30), 2 more. The two must end on the same `state().hash`
+   (or the same `state()` when there is no hash).
+3. Plays it once more with the verb's key held through the `ticks` steps
+   (`press`, else the spec's first key: `left/right|a/d` presses ArrowLeft,
+   `space` Space, `arrows` ArrowRight, `wasd` D, `1-3` 1). It must differ.
+
+It ends `KEYS-OK: proven move, jump; skipped pick card (reason)`. Page errors
+fail it, with the render check's benign list.
+
+Reading a failure: `reset() does not reproduce the run` means the reset leaves
+state behind (a timer, an RNG stream, a held input); `pressing X for 'verb'
+changed nothing` means the key does not reach the simulation under `bp_test`
+in that window. Usual causes: the handler waits for a phase the setup does
+not reach (give `keys.setup`), the verb has a cooldown longer than `settle`
+(raise it), or the handler feeds the simulation only from the live frame
+loop, which does not step in test mode (apply the key on the next step, the
+way the pointer does). A verb the simulation ignores is a finding to fix, not
+a skip.
+
+## 7. `smoke:perf` (PERF-OK)
 
 The built game on a mid-range phone stand-in: a 390 x 844 portrait viewport
 at one device pixel per CSS pixel, the CPU throttled four times through the
@@ -200,7 +247,7 @@ names the fix. Headless Chromium rasterises in software and has no GPU, so a
 number here is a floor for a phone, not a promise; a game well inside the
 budgets here is fine on a phone.
 
-## 7. `typecheck` (TYPECHECK-OK)
+## 8. `typecheck` (TYPECHECK-OK)
 
 `tsc --noEmit -p games/<slug>` with the kit's dependencies in scope. Strict
 TypeScript.
@@ -222,7 +269,7 @@ is the proof. A reviewer plays the game on a phone either way.
 
 - Capture 390 x 780 portrait screenshots of the intro, two mid-run moments
   and the end card, driving the simulation with `__bpTest.tick` under
-  `?bp_test=1`. Headless WebGL is slow:
+  `?bp_test=1`; a game that declares `any` also at 1280 x 720. Headless WebGL is slow:
   `chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader'] })`.
   Look at the images; the checks do not judge taste.
 - Tune with headless bots that bundle `src/game.ts` with esbuild and play

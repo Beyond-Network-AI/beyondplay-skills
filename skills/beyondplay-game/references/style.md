@@ -55,6 +55,10 @@ disclosure).
 - Settings and mode choices live in the HUD or on the end card. One shipped
   game removed its character picker entirely on the founder's word: "nobody
   chooses".
+- Large screens: a game may declare `orientation: 'any'` and keys
+  (mobile-rules.md > Viewport, orientation and devices); the layout of a wide
+  view is part of the game's look, laid out on purpose, never a stretched
+  phone screen; the host prints key hints, the game never does.
 
 ## Wording rules
 

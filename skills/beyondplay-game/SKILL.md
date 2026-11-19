@@ -22,6 +22,11 @@ Facts that shape every decision:
   `dist/beyondplay.json` from it. Nothing else declares the game to the platform.
 - Mobile first, portrait first, one thumb. Runs last 30 to 90 seconds, restart
   is instant, and there is one clear score.
+- Phone and desktop, always. Every listed game also plays on a desktop: keys
+  that really play it (and a wide view when it adapts), declared with
+  `defineDisplay` (`docs/display.md`). A phone-only game publishes unlisted but
+  is not listed (`DISPLAY_PHONE_ONLY`). Build both from the start; never ask
+  whether to. The template already declares Space or Enter to tap.
 - The feed is a swipe surface: the card is already playing when it scrolls in.
   No title screen, no tap-to-start, no instruction text.
 - Duels: the platform hands both players the same seed. Same seed plus same
@@ -171,10 +176,11 @@ or step by step:
 ```bash
 npm run check -- game games/<slug>      # -> PASS          static validator
 npm run check-build -- games/<slug>     # -> BUILD-OK      vite build + manifest, bundle shape
-npm run smoke:render -- games/<slug>    # -> RENDER-OK     pixels, a played run, one bp_game_over
+npm run smoke:render -- games/<slug>    # -> RENDER-OK     pixels, a played run, one bp_game_over, per declared orientation
 npm run smoke:seed -- games/<slug>      # -> DETERMINISTIC same seed, same run
 npm run conformance -- games/<slug>     # -> CONFORMANT    declaration matches behaviour and dist
 npm run smoke:idle -- games/<slug>      # -> IDLE-OK       an untouched run survives 12 s
+npm run smoke:keys -- games/<slug>      # -> KEYS-OK       each declared key moves the run (passes at once without keyboard)
 npm run smoke:perf -- games/<slug>      # -> PERF-OK       first frame, frame time, draw calls, heap on a throttled phone
 npm run typecheck -- games/<slug>       # -> TYPECHECK-OK  strict TypeScript
 ```
@@ -305,6 +311,7 @@ Breaking any of these ships a broken game or a rejected one.
 - [ ] `challenge.submit()` runs once per run; restart works from the in-page button and from `bp_play_again`
 - [ ] Boots into play; `bp_ready` fires once after the first draw; no how-to text; idle survives 12 s
 - [ ] Portrait screenshots inspected; text readable at phone size; canvas fills the viewport
+- [ ] If the game declares `any`: screenshots at 1280 x 720 inspected too
 - [ ] The score, timer, lives, buttons and the end card come from the HUD kit (`src/beyondplay-hud.tsx`, contract section 5b); status on top, controls at the bottom, the middle empty
 - [ ] No external requests in the network log beyond the platform and the template's font
 - [ ] No brand names or third-party IP; fan disclaimer present where required; no emoji
@@ -318,7 +325,7 @@ Breaking any of these ships a broken game or a rejected one.
 ## References
 
 - `references/contract.md`: config fields, manifest fields, the `window.BeyondPlay` SDK, messages, URL parameters, build config, `publish.config.json`, the capabilities a game may request, player items.
-- `references/mobile-rules.md`: touch, viewport, the feed contract, preboot hold, performance, haptics, known iOS and CSP traps.
+- `references/mobile-rules.md`: touch, viewport, orientation and devices, the feed contract, preboot hold, performance, haptics, known iOS and CSP traps.
 - `references/smoke-ladder.md`: the static validator, the checks, what each asserts, how to read a failure.
 - `references/assets-and-audio.md`: free libraries, procedural audio, the music and licence rule, 3D pipeline notes.
 - `references/style.md`: visual direction, palettes, motion, wording rules, store metadata.

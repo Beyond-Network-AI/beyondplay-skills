@@ -53,6 +53,14 @@ travels with the game; the report records the capabilities the game requests
 (`facts.uses`, with the collection for `player.items:cobi`), and `get_contract` serves
 the capability table.
 
+The manifest's `display` (`docs/display.md`) is how hosts lay the game out: the stage
+shape on a large screen, the input kinds and the key hint. The report records it,
+normalized, as `facts.display`. Every listed game plays on a phone and on a desktop:
+a game without `'keyboard'` and its keys is phone-only (`DISPLAY_PHONE_ONLY`, listing
+tier): it publishes unlisted and is not listed. `get_contract`'s Display section says
+whether the hosted build accepts `defineDisplay`, and lists the `DISPLAY_*` rules with
+their tiers.
+
 ## The capabilities
 
 What a game may ask the platform for through `request(name, params)` from

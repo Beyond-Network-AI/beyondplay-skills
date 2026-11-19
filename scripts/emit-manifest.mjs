@@ -10,7 +10,7 @@ const root = resolve(process.argv[2] ?? '.');
 const outPath = join(root, 'dist', 'beyondplay.json');
 
 async function emit() {
-  let manifest = { playerMode: 'single', challenge: null, defaultUnitId: null };
+  let manifest = { playerMode: 'single', challenge: null, defaultUnitId: null, display: { orientation: 'portrait', input: ['touch', 'mouse'], keys: {} } };
   try {
     const esbuild = await import('esbuild');
     const result = await esbuild.build({

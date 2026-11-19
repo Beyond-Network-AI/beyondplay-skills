@@ -43,7 +43,7 @@ const log = (line) => { appendFileSync(LOG, line + '\n'); };
 const say = (line) => { console.log(line); log(line); };
 
 // ── the kit's tools, sandboxed to this checkout ─────────────────────────────
-const ALLOWED_SCRIPTS = new Set(['new-game', 'build', 'check', 'check-build', 'smoke:render', 'smoke:seed', 'conformance', 'smoke:idle', 'typecheck', 'ladder', 'render-icon', 'render-banner', 'pack']);
+const ALLOWED_SCRIPTS = new Set(['new-game', 'build', 'check', 'check-build', 'smoke:render', 'smoke:seed', 'conformance', 'smoke:idle', 'smoke:keys', 'typecheck', 'ladder', 'render-icon', 'render-banner', 'pack']);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'out']);
 const clip = (s, n = 12000) => (s.length > n ? s.slice(0, n / 2) + `\n…[${s.length - n} chars cut]…\n` + s.slice(-n / 2) : s);
 

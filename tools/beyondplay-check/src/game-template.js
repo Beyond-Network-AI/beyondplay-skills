@@ -9,7 +9,11 @@
 // difference there is a warning (drift), not an error. src/beyondplay-audio.ts
 // src/beyondplay-hud.tsx (the HUD kit), src/beyondplay-anim.ts (character
 // animation) and src/beyondplay-save.ts (saved progress) are contract files a
-// game may ship without, like the loader.
+// game may ship without, like the loader. Starter files are the game's from the
+// first commit and never compared: the Tap Timing game (src/App.tsx,
+// src/game.ts), the config, the smoke driver, and the viewport and keyboard
+// helpers (src/viewport.ts, src/keys.ts), which a game may edit or delete and
+// which games scaffolded before them do not have.
 //
 // Only a copy that matches the template is "owned" and skipped by the source
 // scan. A copy that differs is the creator's code, whatever its name: it is
@@ -25,7 +29,7 @@ export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit
 /** Contract files a game may ship without: added after the first games were scaffolded, so absence is drift, not an error. */
 export const OPTIONAL_CONTRACT_FILES = new Set(['src/cobi-kit.ts', 'src/beyondplay-audio.ts', 'src/beyondplay-hud.tsx', 'src/beyondplay-anim.ts', 'src/beyondplay-characters.ts', 'src/beyondplay-avatar.ts', 'src/beyondplay-save.ts', 'src/beyondplay-store.ts']);
 /** Starter files the template ships for the game to replace; never compared. */
-export const STARTER_FILES = new Set(['src/App.tsx', 'src/game.ts', 'src/beyondplay.config.ts', 'smoke.driver.mjs']);
+export const STARTER_FILES = new Set(['src/App.tsx', 'src/game.ts', 'src/beyondplay.config.ts', 'smoke.driver.mjs', 'src/viewport.ts', 'src/keys.ts']);
 
 const TITLE = /<title>[^<]*<\/title>/;
 const normalise = (rel, buf) => (rel === 'index.html' ? Buffer.from(buf.toString('utf8').replace(TITLE, '<title></title>')) : buf);
