@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  3efa561bb7d8c603839a17a8817cc62e8635c3b8
-//   sha256  4bd262625df860c14f5a621759782df3d166c05c01c6d300f327c3697e33d580  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  078ec431a636216ee9ccd8fd1f9c8398c9c24a02
+//   sha256  36f477bfc6d472b59466a8421d86fb636995c18067faad198b58e178855ee3e9  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -65,7 +65,11 @@ export interface AvatarBody {
   items: Record<string, AvatarItem>;
   looks: AvatarLook[];
 }
-export interface CollectibleWearable { slot: string; label: string; file: string; bytes: number; hidesTraits: string[]; hidesEyes: boolean }
+export interface CollectibleWearable {
+  slot: string; label: string; file: string; bytes: number; hidesTraits: string[]; hidesEyes: boolean;
+  /** it covers the head: the body's skin the Head bone carries is not drawn (the Pumpkin Head) */
+  hidesHead?: boolean;
+}
 export interface AvatarCollection {
   label: string;
   /** the collection's own kit on the asset host, and the kit id it must announce */
@@ -125,6 +129,7 @@ export class AvatarKit {
   private loader = new GLTFLoader();
   private files = new Map<string, Promise<GLTF>>();
   private variants = new Map<string, SkinVariants>();
+  private headless = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>();
   private cobiKit: Promise<CobiKit> | null;
 
   private constructor(readonly catalogue: AvatarCatalogue, private base: string, cobi?: CobiKit) {
@@ -227,6 +232,8 @@ export class AvatarKit {
     const bull: CobiBull = await kit.build(spec.traits, { cull: true });
     const a = new Avatar(this, { kind: 'collectible', id: spec.collection, root: bull.root, bones: bull.bones, skeleton: bull.meshes[0].skeleton, scene: bull.root.children[0], meshes: bull.meshes, hipScale: c.hipScale, height: c.height, points: c.points });
     a.collection = c; a.bull = bull;
+    const fur = bull.meshes.find((m) => (m.material as THREE.Material).name === 'fur');
+    if (fur?.geometry.index) a.fur = { mesh: fur, full: fur.geometry };
     a.partsOf = (type: string) => kit.manifest.traits[`${type}/${bull.traits[type]}`]?.parts ?? [];
     a.setSphere();
     try {
@@ -257,6 +264,33 @@ export class AvatarKit {
       g.setIndex(new THREE.BufferAttribute(out.slice(0, n), 1));
       g.boundingBox = full.boundingBox; g.boundingSphere = full.boundingSphere;
       v.made.set(k, g);
+    }
+    return g;
+  }
+
+  /** A collectible body's skin without the triangles the Head bone carries (all three corners weighted mostly to
+   *  it), made once per body geometry: what a wearable that covers the head leaves of it. */
+  withoutHead(mesh: THREE.SkinnedMesh, full: THREE.BufferGeometry): THREE.BufferGeometry {
+    let g = this.headless.get(full);
+    if (!g) {
+      const si = full.getAttribute('skinIndex'), sw = full.getAttribute('skinWeight'), bones = mesh.skeleton.bones;
+      const head = new Uint8Array(si.count);
+      for (let v = 0; v < si.count; v++) {
+        let best = 0, w = -1;
+        for (let k = 0; k < 4; k++) { const x = sw.getComponent(v, k); if (x > w) { w = x; best = si.getComponent(v, k); } }
+        head[v] = /^mixamorigHead/.test(bones[best]?.name ?? '') ? 1 : 0;
+      }
+      const src = full.index!.array, out = new (src.constructor as Uint16ArrayConstructor | Uint32ArrayConstructor)(src.length);
+      let n = 0;
+      for (let t = 0; t < src.length; t += 3) {
+        if (head[src[t]] && head[src[t + 1]] && head[src[t + 2]]) continue;
+        out[n++] = src[t]; out[n++] = src[t + 1]; out[n++] = src[t + 2];
+      }
+      g = new THREE.BufferGeometry();
+      for (const [name, attr] of Object.entries(full.attributes)) g.setAttribute(name, attr);
+      g.setIndex(new THREE.BufferAttribute(out.slice(0, n), 1));
+      g.boundingBox = full.boundingBox; g.boundingSphere = full.boundingSphere;
+      this.headless.set(full, g);
     }
     return g;
   }
@@ -322,6 +356,7 @@ export class Avatar {
   /** @internal */ collection?: AvatarCollection;
   /** @internal */ bull?: CobiBull;
   /** @internal */ partsOf?: (traitType: string) => string[];
+  /** @internal a collectible's fur skin and its full geometry */ fur?: { mesh: THREE.SkinnedMesh; full: THREE.BufferGeometry };
 
   /** @internal made by AvatarKit.build */
   constructor(kit: AvatarKit, p: AvatarParts) {
@@ -377,7 +412,8 @@ export class Avatar {
       for (const z of this.zoned) if (z.zone && z.full.index) z.mesh.geometry = this.kit.skin(this.variantsKey, z.i, z.full, z.zone, hidden);
     } else {
       const w = this.collection!.wearables, parts = new Set(show.flatMap((id) => w[id].hidesTraits).flatMap((t) => this.partsOf!(t)));
-      const eyes = show.some((id) => w[id].hidesEyes);
+      const eyes = show.some((id) => w[id].hidesEyes), head = show.some((id) => w[id].hidesHead);
+      if (this.fur) this.fur.mesh.geometry = head ? this.kit.withoutHead(this.fur.mesh, this.fur.full) : this.fur.full;
       for (const m of this.bull!.meshes) {
         const mat = m.material as THREE.Material;
         if (mat.name === 'eyes') m.visible = !eyes;
@@ -431,6 +467,7 @@ export class Avatar {
     if (this.done) return;
     this.done = true;
     for (const s of this.own) s.dispose();
+    if (this.fur) this.fur.mesh.geometry = this.fur.full;
     if (this.bull) this.bull.release();
     else {
       for (const s of new Set(this.meshes.map((m) => m.skeleton))) s.dispose();
