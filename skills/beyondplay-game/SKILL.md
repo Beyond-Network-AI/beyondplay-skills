@@ -317,6 +317,7 @@ Breaking any of these ships a broken game or a rejected one.
 - [ ] No brand names or third-party IP; fan disclaimer present where required; no emoji
 - [ ] The asset library was searched first (`search_assets`, `add_asset` on the creator MCP); the game has a sound set and a music loop, played through `src/beyondplay-audio.ts`
 - [ ] 3D characters and their moves come from the library (`src/beyondplay-characters.ts`, contract section 5c), loaded from the asset host; no model or clip of the library is copied into the game
+- [ ] A dressed avatar (a Beyonder, the ape, the platform bull or bear, in its own wardrobe's clothes) or a holder's COBI bull with its wearables comes from `src/avatar-kit.ts` (contract section 5c), never assembled by hand; clothes go only on the body whose wardrobe holds them.
 - [ ] Every asset and track is owned, CC0 or commercially licensed, and named in `CREDITS.md`; audio unlocks on a gesture
 - [ ] `assets/icon.png` rendered (and `assets/banner.jpg` if you want one)
 - [ ] `publish.config.json` complete; `visibility` is `unlisted`

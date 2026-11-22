@@ -102,6 +102,8 @@ plays. `docs/player-items.md` is the recipe.
 
 `npm run sync-cobi-kit -- <path to a beyondplay-games checkout>` brings the COBI loader (`library/characters/cobi.ts` there, the one copy) into `template/src/cobi-kit.ts` under a sync header and records its commit and SHA-256 in `template/src/cobi-kit.SOURCE.json`; `npm run sync-cobi-kit -- --check` confirms the copy still matches the record.
 
+`npm run sync-avatar-kit -- <path to a beyondplay-games checkout>` brings the avatar kit (`library/characters/avatar-kit.ts` there, the one copy) into `template/src/avatar-kit.ts` the same way, with one change: its two imports are renamed to the template's files (`./cobi` to `./cobi-kit`, `./characters` to `./beyondplay-characters`). `--check` renames them back and compares the hash with `template/src/avatar-kit.SOURCE.json`.
+
 ## Access
 
 The creator MCP is in private beta: your BeyondPlay account needs creator access and a
