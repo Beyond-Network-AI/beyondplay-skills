@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  8378a1804b9327cf4803619a6ac6f00ab89a316c
-//   sha256  49e82f5aecda84fd9c92ec09c26e1bf1bed71fc6319a5ed5e6f2583213359d07  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  7562811f2da84b7c223edda08a3423b2ae483818
+//   sha256  9bc5c674051c582b2f32a59a4aa2333df685d0db48832598c8f0d3e0409bad59  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -28,7 +28,9 @@
 //   mesh: any outfit draws the body once. A player wears a whole look, as sold (the founder, 23 November: no mixing);
 //   the ape's looks are the live eighteen dressed apes (ape-01 ... ape-18), each with its own fur. The platform bull's
 //   looks add the five live bulls (bull-01 Racer ... bull-05 Hooper): each one file baked from its COBI traits on the
-//   same skeleton, worn whole (no item goes on or off it; build another avatar for another look).
+//   same skeleton, worn whole (no item goes on or off it; build another avatar for another look). The platform bear's
+//   add the five live bears (karate-panda, street-teddy, lava-beach, caveman-brute, zombie-pirate), each the bear kit's
+//   fur and parts on its body, worn whole the same way.
 // - Collectibles (`collection`): a holder's token, exactly as minted, built by its collection's own kit (COBI bulls:
 //   cobi-kit.ts, from the traits the platform hands over), wearing only its collection's wearables (the bulls' back
 //   pieces and the Pumpkin Head), which it covers traits with the way the game Bear Market of the Undead does. Which
@@ -63,8 +65,9 @@ export interface AvatarLook {
   id: string; label: string; items: string[];
   /** the body's fur in this look (the ape) */
   fur?: string;
-  /** a look that is one whole file in place of the body and its items (a live bull, baked from `traits`) */
-  file?: string; bytes?: number; traits?: CobiTraits;
+  /** a look that is one whole file in place of the body and its items (a live bull, baked from `traits`), with the
+   *  parts drawn with it (a live bear's kit parts) */
+  file?: string; bytes?: number; traits?: CobiTraits; parts?: string[];
 }
 export interface AvatarBody {
   label: string; file: string; bytes: number;
@@ -231,7 +234,7 @@ export class AvatarKit {
   /** Start fetching what an avatar will need, without building it (a menu's next pick, the next level's crowd). */
   prefetch(spec: AvatarSpec): void {
     const files = 'body' in spec
-      ? (() => { const b = this.body(spec.body), o = outfitOf(b, spec); if (o.whole) return [o.whole.file!]; if (o.fur) this.texture(b.furs![o.fur].file).catch(() => undefined); return [b.file, ...b.parts, ...o.items.map((i) => b.items[i].file)]; })()
+      ? (() => { const b = this.body(spec.body), o = outfitOf(b, spec); if (o.whole) return [o.whole.file!, ...(o.whole.parts ?? [])]; if (o.fur) this.texture(b.furs![o.fur].file).catch(() => undefined); return [b.file, ...b.parts, ...o.items.map((i) => b.items[i].file)]; })()
       : (spec.wear ?? []).map((w) => this.collection(spec.collection).wearables[w]?.file).filter((f): f is string => !!f);
     for (const f of files) this.gltf(f).catch(() => undefined);
   }
@@ -243,7 +246,8 @@ export class AvatarKit {
       const b = this.body(spec.body);
       const outfit = outfitOf(b, spec);
       // a whole look (a live bull) is its own file, drawn in place of the body, its parts and any item
-      const [body, ...parts] = await Promise.all(outfit.whole ? [this.gltf(outfit.whole.file!)] : [this.gltf(b.file), ...b.parts.map((p) => this.gltf(p))]);
+      const files = outfit.whole ? [outfit.whole.file!, ...(outfit.whole.parts ?? [])] : [b.file, ...b.parts];
+      const [body, ...parts] = await Promise.all(files.map((f) => this.gltf(f)));
       const scene = cloneSkinned(body.scene);
       const root = new THREE.Group();
       root.name = spec.body;
