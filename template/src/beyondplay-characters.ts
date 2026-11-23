@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/characters.ts by scripts/sync-characters.mjs.
-//   commit  c95239b8d1e4ce42425c9772903e58410cf8adc0
-//   sha256  48902a4c25b26c82f22803c011f0e8d94a2f797e73fe47174207f78d8bfdf77c  (of the source file; template/src/beyondplay-characters.SOURCE.json records the same)
+//   commit  a3b516bc88929678b8425bfcb525b91e78057ce2
+//   sha256  c4380ef635ac152bb0d8f41643566637cc2a84dbc122dcc48c4a591a7acf0bb1  (of the source file; template/src/beyondplay-characters.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-characters -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, byte for byte ----
@@ -94,6 +94,11 @@ export function openLibrary(index: string = LIBRARY_INDEX): Promise<Catalogue> {
       const ch = it.meta.character;
       if (typeof ch === 'string') { if (!out.moves.has(ch)) out.moves.set(ch, new Map()); out.moves.get(ch)!.set(it.meta.clip, it); }
       else out.dances.set(it.meta.clip, it);
+    }
+    // A character that shares another's move set (the eighteen dressed apes play `ape-kit`'s) finds it by `movesFrom`.
+    for (const [id, it] of out.characters) {
+      const from = it.meta.movesFrom;
+      if (typeof from === 'string' && !out.moves.has(id) && out.moves.has(from)) out.moves.set(id, out.moves.get(from)!);
     }
     return out;
   })();
