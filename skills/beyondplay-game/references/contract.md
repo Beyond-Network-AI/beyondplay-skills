@@ -452,9 +452,11 @@ avatar catalogue on the asset host. Two kinds, never mixed:
 - **BeyondPlay avatars**, by `body`: `beyonder`, `beyonder-f`, `ape`, `bull`, `bear`, each worn in one
   of its own looks (`avatars.looks(body)`), whole, the way players get them: fur and outfit together.
   The ape's looks are the eighteen dressed apes players have (`ape-01` to `ape-18`), each with its own
-  fur. A slot a look leaves empty shows the body's base layer (the Beyonders wear black shorts, the
-  female Beyonder a sports top). The skin under an outfit is not drawn, and the body is one draw call
-  whatever it wears.
+  fur; the bull's include the five bulls players have (`bull-01` to `bull-05`), each one file on the
+  same bones, worn whole (it takes no item, fur or other look: build another avatar). A slot a look
+  leaves empty shows the body's base layer (the Beyonders wear black shorts, the female Beyonder a
+  sports top). The Beyonders' screens show their face. The skin under an outfit is not drawn, and the
+  body is one draw call whatever it wears.
 - **Collectibles**, by `collection`: a holder's COBI bull from the traits of its `player.items`
   item, exactly as minted (built by `src/cobi-kit.ts`), wearing only its collection's wearables
   (`avatars.wearables('cobi')`: the back pieces and the Pumpkin Head). No BeyondPlay item goes on a

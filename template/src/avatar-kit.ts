@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  99409590207570c6152641caa91d39875373ad9c
-//   sha256  cd3f306b4f3cfaeba8a24140d326d609615a9839d8c6c9076ab1bf1caa7641fe  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  fa59acbeeeb19642c0f0d78699c5b696425e3f22
+//   sha256  6ff45dc7b7400724cb6c5cbdfce7eafebcdacfdedb6f6579c7f654c5e29dfca4  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -17,6 +17,7 @@
 //   me.point('rightHand').add(sword);             // head, back, rightHand, leftHand: metres, following the bone
 //   const ape = await avatars.build({ body: 'ape', look: 'ape-07' });   // a live dressed ape: its fur and its outfit
 //   await ape.wearLook('ape-02');                                       // another whole look
+//   const racer = await avatars.build({ body: 'bull', look: 'bull-01' }); // a live bull (one file, worn whole)
 //   const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear: ['quester'] });   // as minted
 //   scene.remove(me.root); me.release();
 //
@@ -25,7 +26,9 @@
 //   from its own wardrobe (`avatars.wardrobe(body)`), has its own looks, and wears its base layer in any slot left
 //   empty (the Beyonders' black shorts, and her sports top). An item hides the skin it covers, and the body stays one
 //   mesh: any outfit draws the body once. A player wears a whole look, as sold (the founder, 23 November: no mixing);
-//   the ape's looks are the live eighteen dressed apes (ape-01 ... ape-18), each with its own fur.
+//   the ape's looks are the live eighteen dressed apes (ape-01 ... ape-18), each with its own fur. The platform bull's
+//   looks add the five live bulls (bull-01 Racer ... bull-05 Hooper): each one file baked from its COBI traits on the
+//   same skeleton, worn whole (no item goes on or off it; build another avatar for another look).
 // - Collectibles (`collection`): a holder's token, exactly as minted, built by its collection's own kit (COBI bulls:
 //   cobi-kit.ts, from the traits the platform hands over), wearing only its collection's wearables (the bulls' back
 //   pieces and the Pumpkin Head), which it covers traits with the way the game Bear Market of the Undead does. Which
@@ -53,7 +56,13 @@ export type PointName = (typeof POINTS)[number];
 /** An attachment point: a bone (three.js's name for it) and a spot in that bone's own frame. */
 export interface AttachPoint { bone: string; at: [number, number, number] }
 export interface AvatarItem { slot: Slot; label: string; file: string; bytes: number; /** body zones it covers */ hides: string[] }
-export interface AvatarLook { id: string; label: string; items: string[]; /** the body's fur in this look (the ape) */ fur?: string }
+export interface AvatarLook {
+  id: string; label: string; items: string[];
+  /** the body's fur in this look (the ape) */
+  fur?: string;
+  /** a look that is one whole file in place of the body and its items (a live bull, baked from `traits`) */
+  file?: string; bytes?: number; traits?: CobiTraits;
+}
 export interface AvatarBody {
   label: string; file: string; bytes: number;
   /** files always drawn with the body (the platform bull's horns) */
@@ -216,7 +225,7 @@ export class AvatarKit {
   /** Start fetching what an avatar will need, without building it (a menu's next pick, the next level's crowd). */
   prefetch(spec: AvatarSpec): void {
     const files = 'body' in spec
-      ? (() => { const b = this.body(spec.body), o = outfitOf(b, spec); if (o.fur) this.texture(b.furs![o.fur].file).catch(() => undefined); return [b.file, ...b.parts, ...o.items.map((i) => b.items[i].file)]; })()
+      ? (() => { const b = this.body(spec.body), o = outfitOf(b, spec); if (o.whole) return [o.whole.file!]; if (o.fur) this.texture(b.furs![o.fur].file).catch(() => undefined); return [b.file, ...b.parts, ...o.items.map((i) => b.items[i].file)]; })()
       : (spec.wear ?? []).map((w) => this.collection(spec.collection).wearables[w]?.file).filter((f): f is string => !!f);
     for (const f of files) this.gltf(f).catch(() => undefined);
   }
@@ -227,7 +236,8 @@ export class AvatarKit {
     if ('body' in spec) {
       const b = this.body(spec.body);
       const outfit = outfitOf(b, spec);
-      const [body, ...parts] = await Promise.all([this.gltf(b.file), ...b.parts.map((p) => this.gltf(p))]);
+      // a whole look (a live bull) is its own file, drawn in place of the body, its parts and any item
+      const [body, ...parts] = await Promise.all(outfit.whole ? [this.gltf(outfit.whole.file!)] : [this.gltf(b.file), ...b.parts.map((p) => this.gltf(p))]);
       const scene = cloneSkinned(body.scene);
       const root = new THREE.Group();
       root.name = spec.body;
@@ -239,15 +249,15 @@ export class AvatarKit {
       const skel = skins[0].skeleton;
       for (const s of skins.slice(1)) if (s.skeleton !== skel) shareSkeleton(s, s.skeleton.bones, s.skeleton.boneInverses, s.bindMatrix, skel);
       const zoned = skins.map((s, i) => ({ mesh: s, i, zone: s.geometry.getAttribute('_zone') as THREE.BufferAttribute | undefined, full: s.geometry }));
-      const key = spec.body;
+      const key = outfit.whole ? `${spec.body}/${outfit.whole.id}` : spec.body;
       const v = this.variants.get(key) ?? { users: 0, made: new Map() };
       v.users++; this.variants.set(key, v);
       const a = new Avatar(this, { kind: 'body', id: spec.body, root, bones, skeleton: skel, scene, meshes: skins, hipScale: b.hipScale, height: b.height, points: b.points });
-      a.body = b; a.zoned = zoned; a.variantsKey = key;
+      a.body = b; a.zoned = zoned; a.variantsKey = key; a.whole = outfit.whole?.id ?? null;
       a.setSphere();
       try {
         for (const p of parts) a.bindGltf(p);
-        await Promise.all([a.dress(outfit.items), outfit.fur ? a.setFur(outfit.fur) : undefined]);
+        if (!outfit.whole) await Promise.all([a.dress(outfit.items), outfit.fur ? a.setFur(outfit.fur) : undefined]);
         a.lookId = outfit.look;
       } catch (e) {
         a.release();
@@ -334,9 +344,13 @@ export class AvatarKit {
 
 /** What a spec dresses a body in: its look's items and fur (its first look's when it names neither a look nor items),
  *  then each item it names over its own slot (the look is then no longer whole: `look` is null). */
-function outfitOf(b: AvatarBody, spec: { look?: string; wear?: string[] }): { items: string[]; fur?: string; look: string | null } {
+function outfitOf(b: AvatarBody, spec: { look?: string; wear?: string[] }): { items: string[]; fur?: string; look: string | null; whole?: AvatarLook } {
   const look = spec.look !== undefined ? b.looks.find((l) => l.id === spec.look) : spec.wear ? undefined : b.looks[0];
   if (spec.look !== undefined && !look) throw new Error(`avatar kit: no look ${spec.look} (looks: ${b.looks.map((l) => l.id).join(', ')})`);
+  if (look?.file) {
+    if (spec.wear?.length) throw new Error(`avatar kit: ${look.id} is worn whole; it takes no items`);
+    return { items: [], look: look.id, whole: look };
+  }
   const bySlot = new Map<string, string>();
   for (const id of [...(look?.items ?? []), ...(spec.wear ?? [])]) {
     const it = b.items[id];
@@ -390,6 +404,7 @@ export class Avatar {
   /** @internal */ partsOf?: (traitType: string) => string[];
   /** @internal a collectible's fur skin and its full geometry */ furSkin?: { mesh: THREE.SkinnedMesh; full: THREE.BufferGeometry };
   /** @internal the look it wears whole, if it does */ lookId: string | null = null;
+  /** @internal the whole-file look it is (a live bull), which nothing changes */ whole: string | null = null;
 
   /** @internal made by AvatarKit.build */
   constructor(kit: AvatarKit, p: AvatarParts) {
@@ -410,12 +425,15 @@ export class Avatar {
   async wearLook(id: string): Promise<void> {
     const look = this.body?.looks.find((l) => l.id === id);
     if (!look) throw new Error(`avatar kit: no look ${id} for ${this.id}${this.body ? ` (looks: ${this.body.looks.map((l) => l.id).join(', ')})` : ''}`);
+    if (this.whole === id) return;
+    if (this.whole || look.file) throw new Error(`avatar kit: ${this.whole ?? id} is a whole look: build another avatar for it`);
     await Promise.all([this.dress(look.items), look.fur ? this.setFur(look.fur) : undefined]);
     this.lookId = id;
   }
 
   /** Change its fur (the ape): every one of its body's meshes takes the fur's map. */
   async setFur(name: string): Promise<void> {
+    if (this.whole) throw new Error(`avatar kit: ${this.whole} is worn whole`);
     const f = this.body?.furs?.[name];
     if (!f) throw new Error(`avatar kit: no fur ${name} for ${this.id}${this.body?.furs ? ` (furs: ${Object.keys(this.body.furs).join(', ')})` : ''}`);
     const turn = ++this.furTurn;
@@ -439,7 +457,7 @@ export class Avatar {
 
   private shown(outfit: string[]): string[] {
     const b = this.body;
-    if (!b) return [...outfit];
+    if (!b || this.whole) return [...outfit];
     return SLOTS.map((s) => outfit.find((i) => b.items[i].slot === s) ?? b.base[s]).filter((i): i is string => !!i);
   }
 
@@ -458,6 +476,7 @@ export class Avatar {
    *  newer call came in meanwhile, that one is what shows. A file that fails to load leaves the outfit as it was. */
   async dress(ids: string[]): Promise<void> {
     if (this.done) throw new Error('avatar kit: this avatar was released');
+    if (this.whole) throw new Error(`avatar kit: ${this.whole} is worn whole; it takes no items (build another avatar)`);
     this.lookId = null;
     const bySlot = new Map<string, string>();
     for (const id of ids) bySlot.set(this.slotOf(id), id);
