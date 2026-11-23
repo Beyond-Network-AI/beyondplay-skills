@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/characters.ts by scripts/sync-characters.mjs.
-//   commit  a3b516bc88929678b8425bfcb525b91e78057ce2
-//   sha256  c4380ef635ac152bb0d8f41643566637cc2a84dbc122dcc48c4a591a7acf0bb1  (of the source file; template/src/beyondplay-characters.SOURCE.json records the same)
+//   commit  8378a1804b9327cf4803619a6ac6f00ab89a316c
+//   sha256  c56ff9c6c5f8cbdc7580b78102c9fe486e98a9666e50e1cd8a640843b5cc72f5  (of the source file; template/src/beyondplay-characters.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-characters -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, byte for byte ----
@@ -165,9 +165,24 @@ function captureRest(root: THREE.Object3D): Rest | null {
   return rest;
 }
 
+/** The hips' rest on the rig a clip was made on, as numbers (the avatar catalogue stores it for each body's own
+ *  moves, so the clips play on the shared skeleton without that rig): rotation, position, the hips' parent's world
+ *  rotation and scale, and the hips' height over the feet. */
+export interface HipsRest { q: [number, number, number, number]; p: [number, number, number]; parentQ: [number, number, number, number]; parentScale: number; height: number }
+
+/** A clip made on a rig whose hips rest as `rest` says, played on `target` (any root on the shared skeleton): bone
+ *  rotations as they are, the hips carried between the two frames and scaled by the hips' heights. */
+export function retargetFrom(clip: THREE.AnimationClip, rest: HipsRest, target: THREE.Object3D): THREE.AnimationClip {
+  return retargetRest(clip, { q: new THREE.Quaternion(...rest.q), p: new THREE.Vector3(...rest.p), parentQ: new THREE.Quaternion(...rest.parentQ), parentScale: rest.parentScale, height: rest.height }, target);
+}
+
 /** A clip authored on `ref` played on `target`: bone rotations as they are, the hips carried between the two frames and scaled by the hips' heights. */
 function retarget(clip: THREE.AnimationClip, ref: THREE.Object3D, target: THREE.Object3D): THREE.AnimationClip {
-  const rr = captureRest(ref), rt = captureRest(target);
+  return retargetRest(clip, captureRest(ref), target);
+}
+
+function retargetRest(clip: THREE.AnimationClip, rr: Rest | null, target: THREE.Object3D): THREE.AnimationClip {
+  const rt = captureRest(target);
   if (!rr || !rt) return fit(clip.clone(), target);
   const delta = rt.parentQ.clone().invert().multiply(rr.parentQ), deltaInv = delta.clone().invert(), rrInv = rr.q.clone().invert();
   const unit = rt.parentScale > 1e-6 ? rr.parentScale / rt.parentScale : 1, scale = rr.height > 0.01 ? rt.height / rr.height : 1;

@@ -452,9 +452,12 @@ avatar catalogue on the asset host. Two kinds, never mixed:
 - **BeyondPlay avatars**, by `body`: `beyonder`, `beyonder-f`, `ape`, `bull`, `bear`, each worn in one
   of its own looks (`avatars.looks(body)`), whole, the way players get them: fur and outfit together.
   The ape's looks are the eighteen dressed apes players have (`ape-01` to `ape-18`), each with its own
-  fur. A slot a look leaves empty shows the body's base layer (the Beyonders wear black shorts, the
-  female Beyonder a sports top). The skin under an outfit is not drawn, and the body is one draw call
-  whatever it wears.
+  fur; the bull's and the bear's include the five bulls and the five bears players have (`bull-01` to
+  `bull-05`; `karate-panda`, `street-teddy`, `gold-boss`, `neon-raver`, `silver-ops`), each on
+  the same bones, worn whole (it takes no item, fur or other look: build another avatar). A slot a look
+  leaves empty shows the body's base layer (the Beyonders wear black shorts, the female Beyonder a
+  sports top). The Beyonders' screens show their face. The skin under an outfit is not drawn, and the
+  body is one draw call whatever it wears.
 - **Collectibles**, by `collection`: a holder's COBI bull from the traits of its `player.items`
   item, exactly as minted (built by `src/cobi-kit.ts`), wearing only its collection's wearables
   (`avatars.wearables('cobi')`: the back pieces and the Pumpkin Head). No BeyondPlay item goes on a
@@ -475,9 +478,11 @@ const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear
 // on game over, for each: scene.remove(a.root); a.release();
 ```
 
-- Every body plays the same moves as the library's bull (the names above), its hip travel scaled to
-  its own height; the dances are retargeted onto it. `me.fit(clips)` does the same for clips made
-  for the kit bull (`loadClips('runner')`). Ask for clips before the first move plays.
+- Every body plays the same move names (above), each in its own style: the ape and the Beyonders
+  their own moves, the bull, the bear and the collectibles the library's bull moves (hip travel
+  scaled to the body's height); the dances are shared, retargeted onto each body (`me.moveSet`
+  names the set). `me.fit(clips)` fits clips made for the kit bull (`loadClips('runner')`) to any
+  body, so a game's own moves play on every avatar. Ask for clips before the first move plays.
 - `build()` and `wearLook()` reject a look the body does not have; of two quick changes, the later
   is what shows. Single items (`wear`, `takeOff`, `dress`, `setFur`) exist for assets sold on their
   own later; a player's avatar is shown in its whole look, never re-dressed piece by piece.
