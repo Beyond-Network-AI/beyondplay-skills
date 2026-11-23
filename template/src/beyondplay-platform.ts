@@ -206,6 +206,9 @@ export interface PlayerAvatar {
     /** The library move set it plays. */
     moves: string | null;
   } | null;
+  /** The same look in the avatar kit (src/avatar-kit.ts: `build({ body, look })`), where the platform has switched the
+   *  player to the new avatars and the avatar kit has the look; loadPlayerAvatar builds it then. Absent otherwise. */
+  avatarKit?: { body: string; look: string };
 }
 
 export interface CapabilityParams {

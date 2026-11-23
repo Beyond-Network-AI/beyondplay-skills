@@ -482,6 +482,8 @@ const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear
   is what shows. Single items (`wear`, `takeOff`, `dress`, `setFur`) exist for assets sold on their
   own later; a player's avatar is shown in its whole look, never re-dressed piece by piece.
 - Look only, like every item: an outfit or a wearable never changes how a run plays.
+- The player's own avatar: `loadPlayerAvatar()` (`src/beyondplay-avatar.ts`) builds it here when the platform names
+  its look in the avatar kit (`avatarKit` in the `player.avatar` answer); `me.kitAvatar` is then this kit's avatar.
 
 ## 5d. Genre starters
 
@@ -730,7 +732,7 @@ does not list.
 | `player.stats` | open | | `{ best, plays, lastPlayedAt }` for this game, or `null` when signed out; what the leaderboard already shows. |
 | `player.friends` | open | | `[{ displayName, avatar, best }]` for friends who played this game, or `null` when signed out. No ids, no items, no lookup by player. |
 | `player.save` | open | `{ op: 'get' }` or `{ op: 'set', data }` | `{ data, updatedAt }` for a read, `{ ok, updatedAt }` for a write, or `null` when signed out. One JSON value per player per game, at most 16 KB, private to that player. Use `src/beyondplay-save.ts` (section 5e). |
-| `player.avatar` | open | `{ kit }` | `{ kit, id, look, source, model }`: the player's avatar in the kit declared as `player.avatar:<kit>` (`uses: ['player.avatar:ape']`), the same look in every game, answered signed out too with the platform's pick. `id` is the library character (`ape-07`): load it with `loadCharacter(id)` from `src/beyondplay-characters.ts`, or `model.url`. Look only. |
+| `player.avatar` | open | `{ kit }` | `{ kit, id, look, source, model, avatarKit? }`: the player's avatar in the kit declared as `player.avatar:<kit>` (`uses: ['player.avatar:ape']`), the same look in every game, answered signed out too with the platform's pick. `id` is the library character (`ape-07`): load it with `loadCharacter(id)` from `src/beyondplay-characters.ts`, or `model.url`. `avatarKit` (`{ body, look }`), for the players the platform has moved to the new avatars, is the same look in `src/avatar-kit.ts`; `loadPlayerAvatar()` builds whichever applies. Look only. |
 | `store` | open | `{ op: 'items' }` or `{ op: 'buy', item, wait? }` | For `items`: `[{ id, name, blurb, image, price, onSale, owned }]`, the items declared with `defineStore`. For `buy`: `{ outcome: 'bought' \| 'owned' }` once the player owns the item; rejects with `cancelled` when the player closes the platform's sheet. Use `src/beyondplay-store.ts` (section 5f). |
 
 Tiers: `open` is answered without asking the player, which covers
