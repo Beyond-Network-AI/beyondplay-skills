@@ -1,6 +1,6 @@
 // Copy the characters-and-moves loader from a beyondplay-games checkout into the template as the
 // platform-owned src/beyondplay-characters.ts, and record where it came from.
-//   npm run sync-characters -- <path to a beyondplay-games checkout>
+//   npm run sync-characters -- <path to a beyondplay-games checkout>   (use npm run sync-library: the loaders move together)
 //   npm run sync-characters -- --check     # the copy still matches template/src/beyondplay-characters.SOURCE.json
 //
 // The games repository (Beyond-Network-AI/beyondplay-games, library/characters/characters.ts)
@@ -52,7 +52,7 @@ function splitCopy(text) {
 
 function check() {
   if (!existsSync(COPY) || !existsSync(RECORD)) {
-    console.error(`SYNC-FAIL: ${COPY} or ${RECORD} is missing; run npm run sync-characters -- <games checkout>`);
+    console.error(`SYNC-FAIL: ${COPY} or ${RECORD} is missing; run npm run sync-library -- <games checkout>`);
     process.exit(1);
   }
   const record = JSON.parse(readFileSync(RECORD, 'utf8'));

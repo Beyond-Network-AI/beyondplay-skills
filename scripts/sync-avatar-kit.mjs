@@ -1,6 +1,6 @@
 // Copy the avatar kit from a beyondplay-games checkout into the template as the
 // platform-owned src/avatar-kit.ts, and record where it came from.
-//   npm run sync-avatar-kit -- <path to a beyondplay-games checkout>
+//   npm run sync-avatar-kit -- <path to a beyondplay-games checkout>   (use npm run sync-library: the loaders move together)
 //   npm run sync-avatar-kit -- --check     # the copy still matches template/src/avatar-kit.SOURCE.json
 //
 // The games repository (Beyond-Network-AI/beyondplay-games, library/characters/avatar-kit.ts)
@@ -70,7 +70,7 @@ function splitCopy(text) {
 
 function check() {
   if (!existsSync(COPY) || !existsSync(RECORD)) {
-    console.error(`SYNC-FAIL: ${COPY} or ${RECORD} is missing; run npm run sync-avatar-kit -- <games checkout>`);
+    console.error(`SYNC-FAIL: ${COPY} or ${RECORD} is missing; run npm run sync-library -- <games checkout>`);
     process.exit(1);
   }
   const record = JSON.parse(readFileSync(RECORD, 'utf8'));
