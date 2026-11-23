@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  7562811f2da84b7c223edda08a3423b2ae483818
-//   sha256  9bc5c674051c582b2f32a59a4aa2333df685d0db48832598c8f0d3e0409bad59  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  a385721eef0a768a1a6a1915a5630d31ee1c87ca
+//   sha256  cc465df17f2619a670f63624802b7cc97b09787bb2d98ed97cf8d439cc7e2ccc  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -29,8 +29,8 @@
 //   the ape's looks are the live eighteen dressed apes (ape-01 ... ape-18), each with its own fur. The platform bull's
 //   looks add the five live bulls (bull-01 Racer ... bull-05 Hooper): each one file baked from its COBI traits on the
 //   same skeleton, worn whole (no item goes on or off it; build another avatar for another look). The platform bear's
-//   add the five live bears (karate-panda, street-teddy, lava-beach, caveman-brute, zombie-pirate), each the bear kit's
-//   fur and parts on its body, worn whole the same way.
+//   add five bears (karate-panda and street-teddy from live, gold-boss, neon-raver and silver-ops new: library/bears/
+//   looks.json), each the bear kit's fur and parts on its body, worn whole the same way.
 // - Collectibles (`collection`): a holder's token, exactly as minted, built by its collection's own kit (COBI bulls:
 //   cobi-kit.ts, from the traits the platform hands over), wearing only its collection's wearables (the bulls' back
 //   pieces and the Pumpkin Head), which it covers traits with the way the game Bear Market of the Undead does. Which
