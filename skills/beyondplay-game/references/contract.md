@@ -477,9 +477,11 @@ const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear
 // on game over, for each: scene.remove(a.root); a.release();
 ```
 
-- Every body plays the same moves as the library's bull (the names above), its hip travel scaled to
-  its own height; the dances are retargeted onto it. `me.fit(clips)` does the same for clips made
-  for the kit bull (`loadClips('runner')`). Ask for clips before the first move plays.
+- Every body plays the same move names (above), each in its own style: the ape and the Beyonders
+  their own moves, the bull, the bear and the collectibles the library's bull moves (hip travel
+  scaled to the body's height); the dances are shared, retargeted onto each body (`me.moveSet`
+  names the set). `me.fit(clips)` fits clips made for the kit bull (`loadClips('runner')`) to any
+  body, so a game's own moves play on every avatar. Ask for clips before the first move plays.
 - `build()` and `wearLook()` reject a look the body does not have; of two quick changes, the later
   is what shows. Single items (`wear`, `takeOff`, `dress`, `setFur`) exist for assets sold on their
   own later; a player's avatar is shown in its whole look, never re-dressed piece by piece.

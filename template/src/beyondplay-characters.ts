@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/characters.ts by scripts/sync-characters.mjs.
-//   commit  c95239b8d1e4ce42425c9772903e58410cf8adc0
-//   sha256  48902a4c25b26c82f22803c011f0e8d94a2f797e73fe47174207f78d8bfdf77c  (of the source file; template/src/beyondplay-characters.SOURCE.json records the same)
+//   commit  8378a1804b9327cf4803619a6ac6f00ab89a316c
+//   sha256  c56ff9c6c5f8cbdc7580b78102c9fe486e98a9666e50e1cd8a640843b5cc72f5  (of the source file; template/src/beyondplay-characters.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-characters -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, byte for byte ----
@@ -95,6 +95,11 @@ export function openLibrary(index: string = LIBRARY_INDEX): Promise<Catalogue> {
       if (typeof ch === 'string') { if (!out.moves.has(ch)) out.moves.set(ch, new Map()); out.moves.get(ch)!.set(it.meta.clip, it); }
       else out.dances.set(it.meta.clip, it);
     }
+    // A character that shares another's move set (the eighteen dressed apes play `ape-kit`'s) finds it by `movesFrom`.
+    for (const [id, it] of out.characters) {
+      const from = it.meta.movesFrom;
+      if (typeof from === 'string' && !out.moves.has(id) && out.moves.has(from)) out.moves.set(id, out.moves.get(from)!);
+    }
     return out;
   })();
   opened = { index, catalogue };
@@ -160,9 +165,24 @@ function captureRest(root: THREE.Object3D): Rest | null {
   return rest;
 }
 
+/** The hips' rest on the rig a clip was made on, as numbers (the avatar catalogue stores it for each body's own
+ *  moves, so the clips play on the shared skeleton without that rig): rotation, position, the hips' parent's world
+ *  rotation and scale, and the hips' height over the feet. */
+export interface HipsRest { q: [number, number, number, number]; p: [number, number, number]; parentQ: [number, number, number, number]; parentScale: number; height: number }
+
+/** A clip made on a rig whose hips rest as `rest` says, played on `target` (any root on the shared skeleton): bone
+ *  rotations as they are, the hips carried between the two frames and scaled by the hips' heights. */
+export function retargetFrom(clip: THREE.AnimationClip, rest: HipsRest, target: THREE.Object3D): THREE.AnimationClip {
+  return retargetRest(clip, { q: new THREE.Quaternion(...rest.q), p: new THREE.Vector3(...rest.p), parentQ: new THREE.Quaternion(...rest.parentQ), parentScale: rest.parentScale, height: rest.height }, target);
+}
+
 /** A clip authored on `ref` played on `target`: bone rotations as they are, the hips carried between the two frames and scaled by the hips' heights. */
 function retarget(clip: THREE.AnimationClip, ref: THREE.Object3D, target: THREE.Object3D): THREE.AnimationClip {
-  const rr = captureRest(ref), rt = captureRest(target);
+  return retargetRest(clip, captureRest(ref), target);
+}
+
+function retargetRest(clip: THREE.AnimationClip, rr: Rest | null, target: THREE.Object3D): THREE.AnimationClip {
+  const rt = captureRest(target);
   if (!rr || !rt) return fit(clip.clone(), target);
   const delta = rt.parentQ.clone().invert().multiply(rr.parentQ), deltaInv = delta.clone().invert(), rrInv = rr.q.clone().invert();
   const unit = rt.parentScale > 1e-6 ? rr.parentScale / rt.parentScale : 1, scale = rr.height > 0.01 ? rt.height / rr.height : 1;

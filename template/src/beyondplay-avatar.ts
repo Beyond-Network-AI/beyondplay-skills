@@ -86,7 +86,7 @@ async function fromAvatarKit(avatar: PlayerAvatar): Promise<LoadedAvatar | null>
     const bones: Record<string, THREE.Bone> = {};
     for (const [name, bone] of a.bones) bones[name.replace(/^mixamorig:?/, '')] = bone;
     const character: LibraryCharacter = { id: `${want.body}/${want.look}`, root: a.root, bones, meta: { avatarKit: true, body: want.body, look: want.look } };
-    return { avatar, character, moves: avatars.catalogue.moves, clips: (names) => a.clips(names), kitAvatar: a };
+    return { avatar, character, moves: a.moveSet, clips: (names) => a.clips(names), kitAvatar: a };
   } catch {
     return null;
   }

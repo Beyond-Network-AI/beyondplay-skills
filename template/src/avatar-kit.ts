@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  fa59acbeeeb19642c0f0d78699c5b696425e3f22
-//   sha256  6ff45dc7b7400724cb6c5cbdfce7eafebcdacfdedb6f6579c7f654c5e29dfca4  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  8378a1804b9327cf4803619a6ac6f00ab89a316c
+//   sha256  49e82f5aecda84fd9c92ec09c26e1bf1bed71fc6319a5ed5e6f2583213359d07  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -11,7 +11,7 @@
 //   const avatars = await AvatarKit.load();                                 // the catalogue on the asset host
 //   const me = await avatars.build({ body: 'beyonder-f', look: 'pink' });   // 1.6 to 1.9 m, feet at y = 0, faces +Z
 //   scene.add(me.root);
-//   const clips = await me.clips(['idle', 'walk', 'run', 'jump', 'wave']);  // the shared moves, fitted to this body
+//   const clips = await me.clips(['idle', 'walk', 'run', 'jump', 'wave']);  // the moves by their shared names, in her style
 //   const anim = new Animator(me.root, clips, { idle: { clip: 'idle' }, run: { clip: 'run' } });   // or an AnimationMixer
 //   await me.wear(['tee-white']);                // a top from her own wardrobe; the other slots keep what they had
 //   me.point('rightHand').add(sword);             // head, back, rightHand, leftHand: metres, following the bone
@@ -33,8 +33,11 @@
 //   cobi-kit.ts, from the traits the platform hands over), wearing only its collection's wearables (the bulls' back
 //   pieces and the Pumpkin Head), which it covers traits with the way the game Bear Market of the Undead does. Which
 //   wearables a holder owns is the platform's to say; the kit draws what it is asked to.
-// What they share: the bull's 65 bones, the moves (the library's bull moves, every body scaling only its hips' travel
-// by its hip height), and four attachment points measured on each body.
+// What they share: the bull's 65 bones, the moves by name (idle, walk, run, jump, wave, ... and the dances), and four
+// attachment points measured on each body. Each body moves in its own style where it has one (the founder, 23
+// November): the ape plays the live apes' moves and each Beyonder its own, carried onto the shared skeleton; the bull,
+// the bear and the collectibles play the library's bull moves (hips' travel scaled by the body's hip height). So any
+// game plays any avatar by the same names, and a clip a game makes for the bull plays on every body (`fit`).
 //
 // Files: the catalogue (AVATARS_CATALOGUE, kept a minute on the host) names every file; files carry their content's
 // hash in their name, so a re-cut item reaches every game with no code change. Built from the avatar proof
@@ -45,7 +48,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { AVATAR_CULL_RADIUS, CobiKit, shareSkeleton, webpBitmapPlugin, type CobiBull, type CobiTraits } from './cobi-kit';
-import { loadClip, loadDance } from './beyondplay-characters';
+import { loadClip, loadDance, retargetFrom, type HipsRest } from './beyondplay-characters';
 
 export const AVATARS_CATALOGUE = 'https://assets.beyondplay.xyz/library/manifests/avatars.json';
 export const SLOTS = ['top', 'bottom', 'shoes', 'eyes', 'hat'] as const;
@@ -79,6 +82,9 @@ export interface AvatarBody {
   /** a body that comes in several furs (the ape): each fur's map, which every one of its meshes takes, and the default */
   furs?: Record<string, { file: string; bytes: number }>;
   fur?: string;
+  /** its own moves: the library move set it plays (by the shared names) and the hips' rest on the rig that set was made
+   *  on; absent: the catalogue's `moves` */
+  moves?: { set: string; rig: string; rest: HipsRest };
 }
 export interface CollectibleWearable {
   slot: string; label: string; file: string; bytes: number; hidesTraits: string[]; hidesEyes: boolean;
@@ -98,7 +104,7 @@ export interface AvatarCatalogue {
   /** where the files are: each file name is relative to it */
   base: string;
   skeleton: string;
-  /** the library character whose moves every body plays (characters.ts) */
+  /** the library move set every body without its own plays, and the collectibles (characters.ts): the bull's */
   moves: string;
   slots: Slot[];
   zones: string[];
@@ -380,6 +386,8 @@ export class Avatar {
   readonly hipScale: number;
   /** top of the head, metres over the feet */
   readonly height: number;
+  /** the library move set its moves come from ('ape-kit', 'beyonder-pink', 'bull') */
+  get moveSet(): string { return this.body?.moves?.set ?? this.kit.catalogue.moves; }
   private chosen: string[] = [];
   private wanted: string[] = [];
   private kit: AvatarKit;
@@ -509,15 +517,18 @@ export class Avatar {
     }
   }
 
-  /** The shared moves by name, ready for this avatar: the library's bull moves (idle, walk, run, jump, sit, sit-down,
-   *  stand-up, fall, land, glide, wave, point, clap, cheer) with the hips' travel fitted to this body, and the dances
-   *  (backflip, victory, dance-hiphop, dance-samba, dance-slide, dance-ymca) retargeted onto it; a name it has neither
-   *  of is left out. Ask before the first move plays: the dances measure the hips at rest. */
+  /** The moves by their shared names, ready for this avatar (idle, walk, run, jump, sit, sit-down, stand-up, fall,
+   *  land, glide, wave, point, clap, cheer): its own style carried onto it where its body has one (the ape's, each
+   *  Beyonder's), else the library's bull moves with the hips' travel fitted to it; and the dances (backflip, victory,
+   *  dance-hiphop, dance-samba, dance-slide, dance-ymca) retargeted onto it. A name it has none of is left out. Ask
+   *  before the first move plays: the carrying measures the hips at rest. */
   async clips(names: string[]): Promise<Record<string, THREE.AnimationClip>> {
     const out: Record<string, THREE.AnimationClip> = {};
+    const own = this.body?.moves;
     await Promise.all(names.map(async (name) => {
-      const move = await loadClip(this.kit.catalogue.moves, name);
-      const clip = move ? scaleHips(move, this.hipScale) : await loadDance(name, this.root);
+      const mine = own ? await loadClip(own.set, name) : null;
+      const move = mine ? null : await loadClip(this.kit.catalogue.moves, name);
+      const clip = mine ? retargetFrom(mine, own!.rest, this.root) : move ? scaleHips(move, this.hipScale) : await loadDance(name, this.root);
       if (clip) { clip.name = name; out[name] = clip; }
     }));
     return out;
