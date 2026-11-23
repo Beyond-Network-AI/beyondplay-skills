@@ -23,6 +23,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/beyondplay-anim.ts` | platform | `loadClips`, `Animator`: clip packs for the shared bull kit and cross-faded animation states (section 5c). Import it; do not edit it. |
 | `src/beyondplay-characters.ts` | platform | `loadCharacter`, `loadClip`, `clipsFor`, `loadDance`: the library's rigged characters and their moves, from the asset host (section 5c). Import it; do not edit it. |
 | `src/beyondplay-avatar.ts` | platform | `loadPlayerAvatar`, `onPlayerAvatarChange`, `loadAvatar`, `DEFAULT_AVATAR`: the player's avatar in any kit the game declared, loaded with its moves (section 5c). Import it; do not edit it. |
+| `src/avatar-kit.ts` | platform | `AvatarKit`, `Avatar`: every BeyondPlay avatar (the two Beyonders, the ape, the platform bull and bear) dressed from its own wardrobe, and a holder's COBI bull as minted with its collection's wearables, on one skeleton with shared moves and four attachment points (section 5c). Synced from the games repository; import it, do not edit it. |
 | `src/beyondplay-save.ts` | platform | `loadSave`, `writeSave`, `flushSave`: progress that follows the player (section 5e). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
@@ -443,6 +444,47 @@ const bullClips = await clipsFor({ id: 'bull', root: bull.root }, ['idle', 'sit'
 - The loader finds the files through the library's index, so a character or move added to the library
   is there for every game with no change to the template.
 
+### Avatars: bodies, outfits and collectibles
+
+`src/avatar-kit.ts` builds the platform's avatars on one skeleton (the bull's 65 bones), from the
+avatar catalogue on the asset host. Two kinds, never mixed:
+
+- **BeyondPlay avatars**, by `body`: `beyonder`, `beyonder-f`, `ape`, `bull`, `bear`, each worn in one
+  of its own looks (`avatars.looks(body)`), whole, the way players get them: fur and outfit together.
+  The ape's looks are the eighteen dressed apes players have (`ape-01` to `ape-18`), each with its own
+  fur. A slot a look leaves empty shows the body's base layer (the Beyonders wear black shorts, the
+  female Beyonder a sports top). The skin under an outfit is not drawn, and the body is one draw call
+  whatever it wears.
+- **Collectibles**, by `collection`: a holder's COBI bull from the traits of its `player.items`
+  item, exactly as minted (built by `src/cobi-kit.ts`), wearing only its collection's wearables
+  (`avatars.wearables('cobi')`: the back pieces and the Pumpkin Head). No BeyondPlay item goes on a
+  collectible and no collectible wearable on a BeyondPlay avatar.
+
+```ts
+import { AvatarKit } from './avatar-kit';
+import { Animator } from './beyondplay-anim';
+
+const avatars = await AvatarKit.load();
+const me = await avatars.build({ body: 'beyonder-f', look: 'pink' });   // a whole look; an ape: { body: 'ape', look: 'ape-07' }
+scene.add(me.root);                                                      // 1.6 to 1.9 m, feet at y = 0, faces +Z
+const clips = await me.clips(['idle', 'walk', 'run', 'jump', 'wave', 'dance-ymca']);
+const anim = new Animator(me.root, clips, { idle: { clip: 'idle' }, run: { clip: 'run' } });
+await me.wearLook('green');               // another whole look (an ape's brings its fur)
+me.point('rightHand').add(torch);         // 'head', 'back', 'rightHand', 'leftHand': metres, moving with the bone
+const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear: ['quester'] });
+// on game over, for each: scene.remove(a.root); a.release();
+```
+
+- Every body plays the same moves as the library's bull (the names above), its hip travel scaled to
+  its own height; the dances are retargeted onto it. `me.fit(clips)` does the same for clips made
+  for the kit bull (`loadClips('runner')`). Ask for clips before the first move plays.
+- `build()` and `wearLook()` reject a look the body does not have; of two quick changes, the later
+  is what shows. Single items (`wear`, `takeOff`, `dress`, `setFur`) exist for assets sold on their
+  own later; a player's avatar is shown in its whole look, never re-dressed piece by piece.
+- Look only, like every item: an outfit or a wearable never changes how a run plays.
+- The player's own avatar: `loadPlayerAvatar()` (`src/beyondplay-avatar.ts`) builds it here when the platform names
+  its look in the avatar kit (`avatarKit` in the `player.avatar` answer); `me.kitAvatar` is then this kit's avatar.
+
 ## 5d. Genre starters
 
 `npm run new-game -- <slug> "Name" --starter runner` lays a genre starter over the template: a
@@ -690,7 +732,7 @@ does not list.
 | `player.stats` | open | | `{ best, plays, lastPlayedAt }` for this game, or `null` when signed out; what the leaderboard already shows. |
 | `player.friends` | open | | `[{ displayName, avatar, best }]` for friends who played this game, or `null` when signed out. No ids, no items, no lookup by player. |
 | `player.save` | open | `{ op: 'get' }` or `{ op: 'set', data }` | `{ data, updatedAt }` for a read, `{ ok, updatedAt }` for a write, or `null` when signed out. One JSON value per player per game, at most 16 KB, private to that player. Use `src/beyondplay-save.ts` (section 5e). |
-| `player.avatar` | open | `{ kit }` | `{ kit, id, look, source, model }`: the player's avatar in the kit declared as `player.avatar:<kit>` (`uses: ['player.avatar:ape']`), the same look in every game, answered signed out too with the platform's pick. `id` is the library character (`ape-07`): load it with `loadCharacter(id)` from `src/beyondplay-characters.ts`, or `model.url`. Look only. |
+| `player.avatar` | open | `{ kit }` | `{ kit, id, look, source, model, avatarKit? }`: the player's avatar in the kit declared as `player.avatar:<kit>` (`uses: ['player.avatar:ape']`), the same look in every game, answered signed out too with the platform's pick. `id` is the library character (`ape-07`): load it with `loadCharacter(id)` from `src/beyondplay-characters.ts`, or `model.url`. `avatarKit` (`{ body, look }`), for the players the platform has moved to the new avatars, is the same look in `src/avatar-kit.ts`; `loadPlayerAvatar()` builds whichever applies. Look only. |
 | `store` | open | `{ op: 'items' }` or `{ op: 'buy', item, wait? }` | For `items`: `[{ id, name, blurb, image, price, onSale, owned }]`, the items declared with `defineStore`. For `buy`: `{ outcome: 'bought' \| 'owned' }` once the player owns the item; rejects with `cancelled` when the player closes the platform's sheet. Use `src/beyondplay-store.ts` (section 5f). |
 
 Tiers: `open` is answered without asking the player, which covers
@@ -758,8 +800,10 @@ payment is visible to a game. A kit model is assembled by
 `src/cobi-kit.ts` (platform-owned, ships with the template):
 `CobiKit.load(item.model.base, { tokens: false, kit: item.model.kit })`, then
 `kit.build(item.traits)`, clips from `item.model.clips` through an
-`AnimationMixer`, `release()` on game over. A 2D game uses `item.image` as an
-avatar. The recipe: `docs/player-items.md` in the kit.
+`AnimationMixer`, `release()` on game over; or, with the shared moves, the
+attachment points and the collection's wearables, `avatars.build({ collection:
+'cobi', traits: item.traits })` from `src/avatar-kit.ts` (section 5c). A 2D game
+uses `item.image` as an avatar. The recipe: `docs/player-items.md` in the kit.
 
 CSP: a game that declares any `player.*` capability is served with an
 enumerated policy and can only reach the platform's hosts

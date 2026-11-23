@@ -11,9 +11,16 @@
 // move set (a dressed ape plays 'ape-kit', a bull 'bull', a bear its own), and falls back to the pink Beyonder when no
 // host answers (a local run) or the answer is late. `lite: true` takes the character's lighter copy where the library
 // has one, for a game that draws many at once.
+//
+// Avatar Everywhere: where the platform names the same look in the avatar kit (`avatar.avatarKit`, for the players it
+// has switched to the new avatars), the player is built there instead (src/avatar-kit.ts: the shared skeleton, the
+// whole look as they have it, an ape with its fur), and `kitAvatar` is that avatar (its attachment points, its other
+// looks). The same `character.root`, `clips(names)` and moves; release it with `kitAvatar.release()` when done. Should
+// the avatar kit fail to load, the library character below is shown as before.
 
 import type * as THREE from 'three';
 
+import { AvatarKit, type Avatar } from './avatar-kit';
 import { clipsFor, loadCharacter, openLibrary, type LibraryCharacter } from './beyondplay-characters';
 import { onAvatarChange, request, type PlayerAvatar } from './beyondplay-platform';
 
@@ -29,6 +36,9 @@ export interface LoadedAvatar {
   moves: string;
   /** Its named clips for the Animator (beyondplay-anim.ts): moves as they are, dances retargeted; unknown names left out. */
   clips(names: string[]): Promise<Record<string, THREE.AnimationClip>>;
+  /** The avatar kit's avatar, when the platform named the look there (`avatar.avatarKit`): `point('rightHand')`,
+   *  `wearLook(id)`, `release()`. Absent for a library character. */
+  kitAvatar?: Avatar;
 }
 
 export interface LoadAvatarOptions {
@@ -59,8 +69,34 @@ async function idFor(id: string, lite: boolean): Promise<string> {
   return lighter && characters.has(lighter) ? lighter : id;
 }
 
-/** Loads an avatar answer: its library character and the move set it plays. */
+/** The avatar kit's catalogue, read once (and again after a failed read). */
+let kit: Promise<AvatarKit> | null = null;
+function avatarKit(): Promise<AvatarKit> {
+  if (!kit) { kit = AvatarKit.load(); kit.catch(() => { kit = null; }); }
+  return kit;
+}
+
+/** An answer's look in the avatar kit, built (null when it names none, or the avatar kit fails). */
+async function fromAvatarKit(avatar: PlayerAvatar): Promise<LoadedAvatar | null> {
+  const want = avatar.avatarKit;
+  if (!want) return null;
+  try {
+    const avatars = await avatarKit();
+    const a = await avatars.build({ body: want.body, look: want.look });
+    const bones: Record<string, THREE.Bone> = {};
+    for (const [name, bone] of a.bones) bones[name.replace(/^mixamorig:?/, '')] = bone;
+    const character: LibraryCharacter = { id: `${want.body}/${want.look}`, root: a.root, bones, meta: { avatarKit: true, body: want.body, look: want.look } };
+    return { avatar, character, moves: avatars.catalogue.moves, clips: (names) => a.clips(names), kitAvatar: a };
+  } catch {
+    return null;
+  }
+}
+
+/** Loads an avatar answer: its look in the avatar kit when the answer names one, else its library character and the
+ *  move set it plays. */
 export async function loadAvatar(avatar: PlayerAvatar, opts: { lite?: boolean } = {}): Promise<LoadedAvatar> {
+  const fromKit = await fromAvatarKit(avatar);
+  if (fromKit) return fromKit;
   const character = await loadCharacter(await idFor(avatar.id, opts.lite ?? false));
   const moves = text(character.meta.movesFrom) ?? text(character.meta.liteOf) ?? text(avatar.model?.moves) ?? text(character.meta.character) ?? avatar.id;
   return { avatar, character, moves, clips: (names) => clipsFor({ id: moves, root: character.root }, names) };
