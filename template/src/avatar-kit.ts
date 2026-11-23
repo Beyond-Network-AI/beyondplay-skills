@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  078ec431a636216ee9ccd8fd1f9c8398c9c24a02
-//   sha256  36f477bfc6d472b59466a8421d86fb636995c18067faad198b58e178855ee3e9  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  99409590207570c6152641caa91d39875373ad9c
+//   sha256  cd3f306b4f3cfaeba8a24140d326d609615a9839d8c6c9076ab1bf1caa7641fe  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -15,6 +15,8 @@
 //   const anim = new Animator(me.root, clips, { idle: { clip: 'idle' }, run: { clip: 'run' } });   // or an AnimationMixer
 //   await me.wear(['tee-white']);                // a top from her own wardrobe; the other slots keep what they had
 //   me.point('rightHand').add(sword);             // head, back, rightHand, leftHand: metres, following the bone
+//   const ape = await avatars.build({ body: 'ape', look: 'ape-07' });   // a live dressed ape: its fur and its outfit
+//   await ape.wearLook('ape-02');                                       // another whole look
 //   const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear: ['quester'] });   // as minted
 //   scene.remove(me.root); me.release();
 //
@@ -22,7 +24,8 @@
 // - BeyondPlay avatars (`body`): the two Beyonders, the ape, the platform bull and the platform bear. Each dresses only
 //   from its own wardrobe (`avatars.wardrobe(body)`), has its own looks, and wears its base layer in any slot left
 //   empty (the Beyonders' black shorts, and her sports top). An item hides the skin it covers, and the body stays one
-//   mesh: any outfit draws the body once.
+//   mesh: any outfit draws the body once. A player wears a whole look, as sold (the founder, 23 November: no mixing);
+//   the ape's looks are the live eighteen dressed apes (ape-01 ... ape-18), each with its own fur.
 // - Collectibles (`collection`): a holder's token, exactly as minted, built by its collection's own kit (COBI bulls:
 //   cobi-kit.ts, from the traits the platform hands over), wearing only its collection's wearables (the bulls' back
 //   pieces and the Pumpkin Head), which it covers traits with the way the game Bear Market of the Undead does. Which
@@ -42,7 +45,7 @@ import { AVATAR_CULL_RADIUS, CobiKit, shareSkeleton, webpBitmapPlugin, type Cobi
 import { loadClip, loadDance } from './beyondplay-characters';
 
 export const AVATARS_CATALOGUE = 'https://assets.beyondplay.xyz/library/manifests/avatars.json';
-export const SLOTS = ['top', 'bottom', 'shoes', 'hat'] as const;
+export const SLOTS = ['top', 'bottom', 'shoes', 'eyes', 'hat'] as const;
 export type Slot = (typeof SLOTS)[number];
 export const POINTS = ['head', 'back', 'rightHand', 'leftHand'] as const;
 export type PointName = (typeof POINTS)[number];
@@ -50,7 +53,7 @@ export type PointName = (typeof POINTS)[number];
 /** An attachment point: a bone (three.js's name for it) and a spot in that bone's own frame. */
 export interface AttachPoint { bone: string; at: [number, number, number] }
 export interface AvatarItem { slot: Slot; label: string; file: string; bytes: number; /** body zones it covers */ hides: string[] }
-export interface AvatarLook { id: string; label: string; items: string[] }
+export interface AvatarLook { id: string; label: string; items: string[]; /** the body's fur in this look (the ape) */ fur?: string }
 export interface AvatarBody {
   label: string; file: string; bytes: number;
   /** files always drawn with the body (the platform bull's horns) */
@@ -64,6 +67,9 @@ export interface AvatarBody {
   base: Partial<Record<Slot, string>>;
   items: Record<string, AvatarItem>;
   looks: AvatarLook[];
+  /** a body that comes in several furs (the ape): each fur's map, which every one of its meshes takes, and the default */
+  furs?: Record<string, { file: string; bytes: number }>;
+  fur?: string;
 }
 export interface CollectibleWearable {
   slot: string; label: string; file: string; bytes: number; hidesTraits: string[]; hidesEyes: boolean;
@@ -130,6 +136,7 @@ export class AvatarKit {
   private files = new Map<string, Promise<GLTF>>();
   private variants = new Map<string, SkinVariants>();
   private headless = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>();
+  private textures = new Map<string, Promise<THREE.Texture>>();
   private cobiKit: Promise<CobiKit> | null;
 
   private constructor(readonly catalogue: AvatarCatalogue, private base: string, cobi?: CobiKit) {
@@ -176,6 +183,26 @@ export class AvatarKit {
     return p;
   }
 
+  /** One image of the pack (a fur), decoded once through createImageBitmap (no blob: URL, which a strict CSP refuses and
+   *  an iPhone can draw blank) and shared by every avatar using it. */
+  texture(file: string): Promise<THREE.Texture> {
+    const url = this.base + file;
+    let p = this.textures.get(url);
+    if (!p) {
+      p = (async () => {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`avatar kit: HTTP ${r.status} for ${url}`);
+        const t = new THREE.Texture(await createImageBitmap(await r.blob()));
+        t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.minFilter = THREE.LinearMipmapLinearFilter; t.needsUpdate = true;
+        return t;
+      })();
+      this.textures.set(url, p);
+      p.catch(() => this.textures.delete(url));
+    }
+    return p;
+  }
+
   /** The COBI kit the collectible bulls are built with (the game's own when it passed one). */
   cobi(): Promise<CobiKit> {
     if (!this.cobiKit) {
@@ -189,7 +216,7 @@ export class AvatarKit {
   /** Start fetching what an avatar will need, without building it (a menu's next pick, the next level's crowd). */
   prefetch(spec: AvatarSpec): void {
     const files = 'body' in spec
-      ? (() => { const b = this.body(spec.body); return [b.file, ...b.parts, ...outfitOf(b, spec).map((i) => b.items[i].file)]; })()
+      ? (() => { const b = this.body(spec.body), o = outfitOf(b, spec); if (o.fur) this.texture(b.furs![o.fur].file).catch(() => undefined); return [b.file, ...b.parts, ...o.items.map((i) => b.items[i].file)]; })()
       : (spec.wear ?? []).map((w) => this.collection(spec.collection).wearables[w]?.file).filter((f): f is string => !!f);
     for (const f of files) this.gltf(f).catch(() => undefined);
   }
@@ -220,7 +247,8 @@ export class AvatarKit {
       a.setSphere();
       try {
         for (const p of parts) a.bindGltf(p);
-        await a.dress(outfit);
+        await Promise.all([a.dress(outfit.items), outfit.fur ? a.setFur(outfit.fur) : undefined]);
+        a.lookId = outfit.look;
       } catch (e) {
         a.release();
         throw e;
@@ -233,7 +261,7 @@ export class AvatarKit {
     const a = new Avatar(this, { kind: 'collectible', id: spec.collection, root: bull.root, bones: bull.bones, skeleton: bull.meshes[0].skeleton, scene: bull.root.children[0], meshes: bull.meshes, hipScale: c.hipScale, height: c.height, points: c.points });
     a.collection = c; a.bull = bull;
     const fur = bull.meshes.find((m) => (m.material as THREE.Material).name === 'fur');
-    if (fur?.geometry.index) a.fur = { mesh: fur, full: fur.geometry };
+    if (fur?.geometry.index) a.furSkin = { mesh: fur, full: fur.geometry };
     a.partsOf = (type: string) => kit.manifest.traits[`${type}/${bull.traits[type]}`]?.parts ?? [];
     a.setSphere();
     try {
@@ -304,9 +332,9 @@ export class AvatarKit {
   }
 }
 
-/** The items a spec dresses a body in, one per slot: its look's (or its first look's when it names neither a look
- *  nor items), then each item it names over its own slot. */
-function outfitOf(b: AvatarBody, spec: { look?: string; wear?: string[] }): string[] {
+/** What a spec dresses a body in: its look's items and fur (its first look's when it names neither a look nor items),
+ *  then each item it names over its own slot (the look is then no longer whole: `look` is null). */
+function outfitOf(b: AvatarBody, spec: { look?: string; wear?: string[] }): { items: string[]; fur?: string; look: string | null } {
   const look = spec.look !== undefined ? b.looks.find((l) => l.id === spec.look) : spec.wear ? undefined : b.looks[0];
   if (spec.look !== undefined && !look) throw new Error(`avatar kit: no look ${spec.look} (looks: ${b.looks.map((l) => l.id).join(', ')})`);
   const bySlot = new Map<string, string>();
@@ -315,7 +343,8 @@ function outfitOf(b: AvatarBody, spec: { look?: string; wear?: string[] }): stri
     if (!it) throw new Error(`avatar kit: ${id} is not in this body's wardrobe (${Object.keys(b.items).join(', ')})`);
     bySlot.set(it.slot, id);
   }
-  return [...bySlot.values()];
+  if (look?.fur && !b.furs?.[look.fur]) throw new Error(`avatar kit: look ${look.id} names fur ${look.fur}, which the body lacks`);
+  return { items: [...bySlot.values()], fur: look?.fur ?? b.fur, look: look && !spec.wear?.length ? look.id : null };
 }
 
 interface AvatarParts {
@@ -348,6 +377,9 @@ export class Avatar {
   private worn = new Map<string, THREE.SkinnedMesh[]>();
   private own: THREE.Skeleton[] = [];
   private sphere: THREE.Sphere | null = null;
+  private furName: string | null = null;
+  private furTurn = 0;
+  private furMats = new Map<THREE.Material, THREE.Material>();
   private turn = 0;
   private done = false;
   /** @internal */ body?: AvatarBody;
@@ -356,7 +388,8 @@ export class Avatar {
   /** @internal */ collection?: AvatarCollection;
   /** @internal */ bull?: CobiBull;
   /** @internal */ partsOf?: (traitType: string) => string[];
-  /** @internal a collectible's fur skin and its full geometry */ fur?: { mesh: THREE.SkinnedMesh; full: THREE.BufferGeometry };
+  /** @internal a collectible's fur skin and its full geometry */ furSkin?: { mesh: THREE.SkinnedMesh; full: THREE.BufferGeometry };
+  /** @internal the look it wears whole, if it does */ lookId: string | null = null;
 
   /** @internal made by AvatarKit.build */
   constructor(kit: AvatarKit, p: AvatarParts) {
@@ -366,6 +399,40 @@ export class Avatar {
 
   /** What it wears, one per slot: item ids (a body) or wearable ids (a collectible), the base layer not included. */
   get outfit(): string[] { return [...this.chosen]; }
+
+  /** The look it wears whole ('ape-07', 'pink'), or null once single items changed it (or for a collectible). */
+  get look(): string | null { return this.lookId; }
+
+  /** Its fur ('slate'), for a body that comes in several (the ape); null otherwise. */
+  get fur(): string | null { return this.furName; }
+
+  /** Wear one of its body's looks whole: its items (the base layer in the slots it leaves empty) and its fur. */
+  async wearLook(id: string): Promise<void> {
+    const look = this.body?.looks.find((l) => l.id === id);
+    if (!look) throw new Error(`avatar kit: no look ${id} for ${this.id}${this.body ? ` (looks: ${this.body.looks.map((l) => l.id).join(', ')})` : ''}`);
+    await Promise.all([this.dress(look.items), look.fur ? this.setFur(look.fur) : undefined]);
+    this.lookId = id;
+  }
+
+  /** Change its fur (the ape): every one of its body's meshes takes the fur's map. */
+  async setFur(name: string): Promise<void> {
+    const f = this.body?.furs?.[name];
+    if (!f) throw new Error(`avatar kit: no fur ${name} for ${this.id}${this.body?.furs ? ` (furs: ${Object.keys(this.body.furs).join(', ')})` : ''}`);
+    const turn = ++this.furTurn;
+    const tex = await this.kit.texture(f.file);
+    if (turn !== this.furTurn || this.done) return;
+    for (const m of this.meshes) {
+      const src = m.material as THREE.MeshStandardMaterial;
+      let own = this.furMats.get(src) as THREE.MeshStandardMaterial | undefined;
+      if (!own) {
+        own = [...this.furMats.values()].includes(src) ? src : src.clone();
+        if (own !== src) { this.furMats.set(src, own); this.furMats.set(own, own); }
+      }
+      own.map = tex; own.needsUpdate = true; m.material = own;
+    }
+    this.furName = name;
+    this.lookId = null;
+  }
 
   /** What it draws: its outfit and, for a body, its base layer in the slots its outfit leaves empty. */
   get showing(): string[] { return this.shown(this.chosen); }
@@ -391,6 +458,7 @@ export class Avatar {
    *  newer call came in meanwhile, that one is what shows. A file that fails to load leaves the outfit as it was. */
   async dress(ids: string[]): Promise<void> {
     if (this.done) throw new Error('avatar kit: this avatar was released');
+    this.lookId = null;
     const bySlot = new Map<string, string>();
     for (const id of ids) bySlot.set(this.slotOf(id), id);
     const outfit = [...bySlot.values()];
@@ -413,7 +481,7 @@ export class Avatar {
     } else {
       const w = this.collection!.wearables, parts = new Set(show.flatMap((id) => w[id].hidesTraits).flatMap((t) => this.partsOf!(t)));
       const eyes = show.some((id) => w[id].hidesEyes), head = show.some((id) => w[id].hidesHead);
-      if (this.fur) this.fur.mesh.geometry = head ? this.kit.withoutHead(this.fur.mesh, this.fur.full) : this.fur.full;
+      if (this.furSkin) this.furSkin.mesh.geometry = head ? this.kit.withoutHead(this.furSkin.mesh, this.furSkin.full) : this.furSkin.full;
       for (const m of this.bull!.meshes) {
         const mat = m.material as THREE.Material;
         if (mat.name === 'eyes') m.visible = !eyes;
@@ -467,7 +535,8 @@ export class Avatar {
     if (this.done) return;
     this.done = true;
     for (const s of this.own) s.dispose();
-    if (this.fur) this.fur.mesh.geometry = this.fur.full;
+    for (const [src, own] of this.furMats) if (src !== own) own.dispose();
+    if (this.furSkin) this.furSkin.mesh.geometry = this.furSkin.full;
     if (this.bull) this.bull.release();
     else {
       for (const s of new Set(this.meshes.map((m) => m.skeleton))) s.dispose();

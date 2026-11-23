@@ -449,11 +449,12 @@ const bullClips = await clipsFor({ id: 'bull', root: bull.root }, ['idle', 'sit'
 `src/avatar-kit.ts` builds the platform's avatars on one skeleton (the bull's 65 bones), from the
 avatar catalogue on the asset host. Two kinds, never mixed:
 
-- **BeyondPlay avatars**, by `body`: `beyonder`, `beyonder-f`, `ape`, `bull`, `bear`. Each dresses only
-  from its own wardrobe (`avatars.wardrobe(body)`: item ids by slot, `top`, `bottom`, `shoes`, `hat`)
-  and has its own looks (`avatars.looks(body)`). A slot left empty shows its base layer (the
-  Beyonders wear black shorts, the female Beyonder a sports top). The skin under an outfit is not
-  drawn, and the body is one draw call whatever it wears.
+- **BeyondPlay avatars**, by `body`: `beyonder`, `beyonder-f`, `ape`, `bull`, `bear`, each worn in one
+  of its own looks (`avatars.looks(body)`), whole, the way players get them: fur and outfit together.
+  The ape's looks are the eighteen dressed apes players have (`ape-01` to `ape-18`), each with its own
+  fur. A slot a look leaves empty shows the body's base layer (the Beyonders wear black shorts, the
+  female Beyonder a sports top). The skin under an outfit is not drawn, and the body is one draw call
+  whatever it wears.
 - **Collectibles**, by `collection`: a holder's COBI bull from the traits of its `player.items`
   item, exactly as minted (built by `src/cobi-kit.ts`), wearing only its collection's wearables
   (`avatars.wearables('cobi')`: the back pieces and the Pumpkin Head). No BeyondPlay item goes on a
@@ -464,11 +465,11 @@ import { AvatarKit } from './avatar-kit';
 import { Animator } from './beyondplay-anim';
 
 const avatars = await AvatarKit.load();
-const me = await avatars.build({ body: 'beyonder-f', look: 'pink' });   // or { body, wear: ['tee-white', ...] }
+const me = await avatars.build({ body: 'beyonder-f', look: 'pink' });   // a whole look; an ape: { body: 'ape', look: 'ape-07' }
 scene.add(me.root);                                                      // 1.6 to 1.9 m, feet at y = 0, faces +Z
 const clips = await me.clips(['idle', 'walk', 'run', 'jump', 'wave', 'dance-ymca']);
 const anim = new Animator(me.root, clips, { idle: { clip: 'idle' }, run: { clip: 'run' } });
-await me.wear(['cap']);                  // one slot changes, the rest stay; takeOff(['hat']) empties it
+await me.wearLook('green');               // another whole look (an ape's brings its fur)
 me.point('rightHand').add(torch);         // 'head', 'back', 'rightHand', 'leftHand': metres, moving with the bone
 const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear: ['quester'] });
 // on game over, for each: scene.remove(a.root); a.release();
@@ -477,8 +478,9 @@ const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear
 - Every body plays the same moves as the library's bull (the names above), its hip travel scaled to
   its own height; the dances are retargeted onto it. `me.fit(clips)` does the same for clips made
   for the kit bull (`loadClips('runner')`). Ask for clips before the first move plays.
-- `build()`, `wear()` and `dress()` reject an id that is not in that avatar's wardrobe (or its
-  collection's wearables); of two quick changes, the later is what shows.
+- `build()` and `wearLook()` reject a look the body does not have; of two quick changes, the later
+  is what shows. Single items (`wear`, `takeOff`, `dress`, `setFur`) exist for assets sold on their
+  own later; a player's avatar is shown in its whole look, never re-dressed piece by piece.
 - Look only, like every item: an outfit or a wearable never changes how a run plays.
 
 ## 5d. Genre starters
