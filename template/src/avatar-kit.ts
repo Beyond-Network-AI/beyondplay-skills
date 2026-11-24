@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  a385721eef0a768a1a6a1915a5630d31ee1c87ca
-//   sha256  cc465df17f2619a670f63624802b7cc97b09787bb2d98ed97cf8d439cc7e2ccc  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  f6584b401295910746d1d995f287862de8442913
+//   sha256  5f88a3c881403d8d9bc29998c5e2b35a107ef29cddc480b913a71a2372e00059  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -13,7 +13,7 @@
 //   scene.add(me.root);
 //   const clips = await me.clips(['idle', 'walk', 'run', 'jump', 'wave']);  // the moves by their shared names, in her style
 //   const anim = new Animator(me.root, clips, { idle: { clip: 'idle' }, run: { clip: 'run' } });   // or an AnimationMixer
-//   await me.wear(['tee-white']);                // a top from her own wardrobe; the other slots keep what they had
+//   await me.wearLook('gold');                   // another of her looks: the original Beyonder in another colour
 //   me.point('rightHand').add(sword);             // head, back, rightHand, leftHand: metres, following the bone
 //   const ape = await avatars.build({ body: 'ape', look: 'ape-07' });   // a live dressed ape: its fur and its outfit
 //   await ape.wearLook('ape-02');                                       // another whole look
@@ -22,11 +22,13 @@
 //   scene.remove(me.root); me.release();
 //
 // Two worlds (library/beyonder/README.md, the founder's direction of 21 November 2026):
-// - BeyondPlay avatars (`body`): the two Beyonders, the ape, the platform bull and the platform bear. Each dresses only
-//   from its own wardrobe (`avatars.wardrobe(body)`), has its own looks, and wears its base layer in any slot left
-//   empty (the Beyonders' black shorts, and her sports top). An item hides the skin it covers, and the body stays one
-//   mesh: any outfit draws the body once. A player wears a whole look, as sold (the founder, 23 November: no mixing);
-//   the ape's looks are the live eighteen dressed apes (ape-01 ... ape-18), each with its own fur. The platform bull's
+// - BeyondPlay avatars (`body`): the two Beyonders, the ape, the platform bull and the platform bear, each in its own
+//   looks. A player wears a whole look, as sold (the founder, 23 November: no mixing). The Beyonders are the worlds'
+//   originals, each one model with its clothes painted on (the founder, 23 November: never new clothes or wearables
+//   for them): their looks are colours of it (beyonder-f: pink, gold, sky, black; beyonder: green, orange, red, navy),
+//   worn whole, and they take no item. The ape, the bull and the bear dress only from their own wardrobes
+//   (`avatars.wardrobe(body)`); an item hides the skin it covers, and the body stays one mesh. The ape's looks are the
+//   live eighteen dressed apes (ape-01 ... ape-18), each with its own fur. The platform bull's
 //   looks add the five live bulls (bull-01 Racer ... bull-05 Hooper): each one file baked from its COBI traits on the
 //   same skeleton, worn whole (no item goes on or off it; build another avatar for another look). The platform bear's
 //   add five bears (karate-panda and street-teddy from live, gold-boss, neon-raver and silver-ops new: library/bears/
