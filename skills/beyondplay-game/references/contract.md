@@ -23,7 +23,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/beyondplay-anim.ts` | platform | `loadClips`, `Animator`: clip packs for the shared bull kit and cross-faded animation states (section 5c). Import it; do not edit it. |
 | `src/beyondplay-characters.ts` | platform | `loadCharacter`, `loadClip`, `clipsFor`, `loadDance`: the library's rigged characters and their moves, from the asset host (section 5c). Import it; do not edit it. |
 | `src/beyondplay-avatar.ts` | platform | `loadPlayerAvatar`, `onPlayerAvatarChange`, `loadAvatar`, `DEFAULT_AVATAR`: the player's avatar in any kit the game declared, loaded with its moves (section 5c). Import it; do not edit it. |
-| `src/avatar-kit.ts` | platform | `AvatarKit`, `Avatar`: every BeyondPlay avatar (the two Beyonders, the ape, the platform bull and bear) dressed from its own wardrobe, and a holder's COBI bull as minted with its collection's wearables, on one skeleton with shared moves and four attachment points (section 5c). Synced from the games repository; import it, do not edit it. |
+| `src/avatar-kit.ts` | platform | `AvatarKit`, `Avatar`: every BeyondPlay avatar (the two Beyonders, the ape, the platform bull and bear) in its own whole looks (the Beyonders by colour only), and a holder's COBI bull as minted with its collection's wearables, on one skeleton with shared moves and four attachment points (section 5c). Synced from the games repository; import it, do not edit it. |
 | `src/beyondplay-save.ts` | platform | `loadSave`, `writeSave`, `flushSave`: progress that follows the player (section 5e). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
@@ -454,10 +454,11 @@ avatar catalogue on the asset host. Two kinds, never mixed:
   The ape's looks are the eighteen dressed apes players have (`ape-01` to `ape-18`), each with its own
   fur; the bull's and the bear's include the five bulls and the five bears players have (`bull-01` to
   `bull-05`; `karate-panda`, `street-teddy`, `gold-boss`, `neon-raver`, `silver-ops`), each on
-  the same bones, worn whole (it takes no item, fur or other look: build another avatar). A slot a look
-  leaves empty shows the body's base layer (the Beyonders wear black shorts, the female Beyonder a
-  sports top). The Beyonders' screens show their face. The skin under an outfit is not drawn, and the
-  body is one draw call whatever it wears.
+  the same bones, worn whole (it takes no item, fur or other look: build another avatar). The
+  Beyonders are the worlds' two originals, each one model with its clothes painted on: their looks are
+  colours of it (`pink`, `gold`, `sky`, `black` on `beyonder-f`; `green`, `orange`, `red`, `navy` on
+  `beyonder`), and they take no item, ever. Their screens show their face. Under the ape's, the bull's
+  and the bear's outfits the skin is not drawn, and the body is one draw call whatever it wears.
 - **Collectibles**, by `collection`: a holder's COBI bull from the traits of its `player.items`
   item, exactly as minted (built by `src/cobi-kit.ts`), wearing only its collection's wearables
   (`avatars.wearables('cobi')`: the back pieces and the Pumpkin Head). No BeyondPlay item goes on a
@@ -472,7 +473,7 @@ const me = await avatars.build({ body: 'beyonder-f', look: 'pink' });   // a who
 scene.add(me.root);                                                      // 1.6 to 1.9 m, feet at y = 0, faces +Z
 const clips = await me.clips(['idle', 'walk', 'run', 'jump', 'wave', 'dance-ymca']);
 const anim = new Animator(me.root, clips, { idle: { clip: 'idle' }, run: { clip: 'run' } });
-await me.wearLook('green');               // another whole look (an ape's brings its fur)
+await me.wearLook('gold');                // another whole look (hers: a colour; an ape's brings its fur)
 me.point('rightHand').add(torch);         // 'head', 'back', 'rightHand', 'leftHand': metres, moving with the bone
 const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear: ['quester'] });
 // on game over, for each: scene.remove(a.root); a.release();
@@ -485,7 +486,8 @@ const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear
   body, so a game's own moves play on every avatar. Ask for clips before the first move plays.
 - `build()` and `wearLook()` reject a look the body does not have; of two quick changes, the later
   is what shows. Single items (`wear`, `takeOff`, `dress`, `setFur`) exist for assets sold on their
-  own later; a player's avatar is shown in its whole look, never re-dressed piece by piece.
+  own later, never for a Beyonder; a player's avatar is shown in its whole look, never re-dressed
+  piece by piece.
 - Look only, like every item: an outfit or a wearable never changes how a run plays.
 - The player's own avatar: `loadPlayerAvatar()` (`src/beyondplay-avatar.ts`) builds it here when the platform names
   its look in the avatar kit (`avatarKit` in the `player.avatar` answer); `me.kitAvatar` is then this kit's avatar.
