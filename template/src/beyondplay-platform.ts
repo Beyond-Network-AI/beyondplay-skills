@@ -206,10 +206,19 @@ export interface PlayerAvatar {
     /** The library move set it plays. */
     moves: string | null;
   } | null;
-  /** The same look in the avatar kit (src/avatar-kit.ts: `build({ body, look })`), where the platform has switched the
-   *  player to the new avatars and the avatar kit has the look; loadPlayerAvatar builds it then. Absent otherwise. */
-  avatarKit?: { body: string; look: string };
+  /** The same look in the avatar kit (src/avatar-kit.ts), where the avatar kit has it; loadPlayerAvatar builds it then.
+   *  A platform look is `{ body, look }` (`build({ body, look })`). A holder's own token (a COBI bull they chose as their
+   *  avatar) is `{ collection, traits }` (`build({ collection, traits, wear })`), built exactly as minted; `id`, `look`
+   *  and `model` then name the platform's bull for a game that cannot build it. Absent otherwise. */
+  avatarKit?: PlayerAvatarLook | PlayerAvatarCollectible;
 }
+
+/** A platform look in the avatar kit: the body and the whole look it wears. */
+export interface PlayerAvatarLook { body: string; look: string }
+
+/** A holder's own token in the avatar kit: its collection ('cobi') and its traits as minted (trait type to value), with
+ *  the collection's wearables the platform says they own (`wear`, none yet). Never a token id or a wallet. */
+export interface PlayerAvatarCollectible { collection: string; traits: Record<string, string>; wear?: string[] }
 
 export interface CapabilityParams {
   capabilities: undefined;
