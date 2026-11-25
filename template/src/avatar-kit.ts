@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  f6584b401295910746d1d995f287862de8442913
-//   sha256  5f88a3c881403d8d9bc29998c5e2b35a107ef29cddc480b913a71a2372e00059  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  506e0f0d26f47088c02da074271d77bb86e3de82
+//   sha256  5daf87fa38a326975c3c0c59253ea820b36efaaf1093f401920a0deeaa8a9fea  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -95,6 +95,9 @@ export interface CollectibleWearable {
   slot: string; label: string; file: string; bytes: number; hidesTraits: string[]; hidesEyes: boolean;
   /** it covers the head: the body's skin the Head bone carries is not drawn (the Pumpkin Head) */
   hidesHead?: boolean;
+  /** the kit parts it goes over, by name, wherever the bull has them: a COBI outfit is one trait (top, trousers,
+   *  shoes), so shoes hide only its shoes, trousers its trousers */
+  hidesParts?: string[];
 }
 export interface AvatarCollection {
   label: string;
@@ -512,7 +515,7 @@ export class Avatar {
       const hidden = new Set(show.flatMap((i) => b.items[i].hides).map((z) => zones.indexOf(z)).filter((z) => z >= 0));
       for (const z of this.zoned) if (z.zone && z.full.index) z.mesh.geometry = this.kit.skin(this.variantsKey, z.i, z.full, z.zone, hidden);
     } else {
-      const w = this.collection!.wearables, parts = new Set(show.flatMap((id) => w[id].hidesTraits).flatMap((t) => this.partsOf!(t)));
+      const w = this.collection!.wearables, parts = new Set([...show.flatMap((id) => w[id].hidesTraits).flatMap((t) => this.partsOf!(t)), ...show.flatMap((id) => w[id].hidesParts ?? [])]);
       const eyes = show.some((id) => w[id].hidesEyes), head = show.some((id) => w[id].hidesHead);
       if (this.furSkin) this.furSkin.mesh.geometry = head ? this.kit.withoutHead(this.furSkin.mesh, this.furSkin.full) : this.furSkin.full;
       for (const m of this.bull!.meshes) {
