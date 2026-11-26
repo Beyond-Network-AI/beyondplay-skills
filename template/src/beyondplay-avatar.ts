@@ -17,12 +17,17 @@
 // whole look as they have it, an ape with its fur), and `kitAvatar` is that avatar (its attachment points, its other
 // looks). The same `character.root`, `clips(names)` and moves; release it with `kitAvatar.release()` when done. Should
 // the avatar kit fail to load, the library character below is shown as before.
+//
+// NFT avatars: a holder who chose their own token (a COBI bull) is answered as its collection and traits
+// (`avatar.avatarKit = { collection: 'cobi', traits }`), and built here exactly as minted by the collection's own kit,
+// playing the bull's moves; `character.meta.collection` names it. A game built before the avatar kit, or one where the
+// collectible fails to build, shows the platform's bull the answer also names (`avatar.id`).
 
 import type * as THREE from 'three';
 
 import { AvatarKit, type Avatar } from './avatar-kit';
 import { clipsFor, loadCharacter, openLibrary, type LibraryCharacter } from './beyondplay-characters';
-import { onAvatarChange, request, type PlayerAvatar } from './beyondplay-platform';
+import { onAvatarChange, request, type PlayerAvatar, type PlayerAvatarCollectible, type PlayerAvatarLook } from './beyondplay-platform';
 
 /** The look every player has until they choose, and the one a game shows when no host answers. */
 export const DEFAULT_AVATAR: PlayerAvatar = { kit: 'beyonder', id: 'beyonder-pink', look: { preset: 'pink' }, source: 'default', model: null };
@@ -76,16 +81,43 @@ function avatarKit(): Promise<AvatarKit> {
   return kit;
 }
 
+/** Whether an answer's avatar-kit look is a holder's own token (a collection and its traits), not a platform look. */
+export function isCollectible(want: PlayerAvatar['avatarKit']): want is PlayerAvatarCollectible {
+  return !!want && typeof (want as PlayerAvatarCollectible).collection === 'string';
+}
+
+/** The traits as the collection's kit takes them: string values only, none empty (null when nothing is left). */
+function traitsOf(want: PlayerAvatarCollectible): Record<string, string> | null {
+  const traits: Record<string, string> = {};
+  for (const [k, v] of Object.entries(want.traits ?? {})) if (typeof v === 'string' && v) traits[k] = v;
+  return Object.keys(traits).length ? traits : null;
+}
+
 /** An answer's look in the avatar kit, built (null when it names none, or the avatar kit fails). */
 async function fromAvatarKit(avatar: PlayerAvatar): Promise<LoadedAvatar | null> {
   const want = avatar.avatarKit;
   if (!want) return null;
   try {
     const avatars = await avatarKit();
-    const a = await avatars.build({ body: want.body, look: want.look });
+    let a: Avatar;
+    let id: string;
+    let meta: LibraryCharacter['meta'];
+    if (isCollectible(want)) {
+      // A holder's own token, as minted (only COBI bulls today: the avatar kit names the collections it builds).
+      const traits = traitsOf(want);
+      if (want.collection !== 'cobi' || !traits) return null;
+      a = await avatars.build({ collection: 'cobi', traits, wear: want.wear?.filter((w) => typeof w === 'string') });
+      id = `${want.collection}/collectible`;
+      meta = { avatarKit: true, collection: want.collection };
+    } else {
+      const look = want as PlayerAvatarLook;
+      a = await avatars.build({ body: look.body, look: look.look });
+      id = `${look.body}/${look.look}`;
+      meta = { avatarKit: true, body: look.body, look: look.look };
+    }
     const bones: Record<string, THREE.Bone> = {};
     for (const [name, bone] of a.bones) bones[name.replace(/^mixamorig:?/, '')] = bone;
-    const character: LibraryCharacter = { id: `${want.body}/${want.look}`, root: a.root, bones, meta: { avatarKit: true, body: want.body, look: want.look } };
+    const character: LibraryCharacter = { id, root: a.root, bones, meta };
     return { avatar, character, moves: a.moveSet, clips: (names) => a.clips(names), kitAvatar: a };
   } catch {
     return null;
