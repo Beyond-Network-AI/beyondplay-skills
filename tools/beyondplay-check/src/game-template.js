@@ -5,11 +5,12 @@
 // scaffolded before it existed may lack it, which is drift, not an error, but
 // an edited copy is). The other files the template ships (vite.config.ts,
 // tsconfig.json, src/haptics.ts, src/index.css, src/webkit-image-hardening.ts,
-// src/cobi-kit.SOURCE.json, src/avatar-kit.SOURCE.json) are not protected by the contract, so a
+// src/cobi-kit.SOURCE.json, src/avatar-kit.SOURCE.json, src/crowd-copy.SOURCE.json) are not protected by the contract, so a
 // difference there is a warning (drift), not an error. src/beyondplay-audio.ts
 // src/beyondplay-hud.tsx (the HUD kit), src/beyondplay-anim.ts (character
 // animation), src/avatar-kit.ts (the avatars, synced like the loader by
-// scripts/sync-avatar-kit.mjs) and src/beyondplay-save.ts (saved progress) are contract files a
+// scripts/sync-avatar-kit.mjs), src/crowd-copy.ts (an avatar in one draw call, synced the same way by
+// scripts/sync-crowd-copy.mjs) and src/beyondplay-save.ts (saved progress) are contract files a
 // game may ship without, like the loader. Starter files are the game's from the
 // first commit and never compared: the Tap Timing game (src/App.tsx,
 // src/game.ts), the config, the smoke driver, and the viewport and keyboard
@@ -26,9 +27,9 @@ import { fileURLToPath } from 'node:url';
 import { sha256, walk } from './files.js';
 import { DOCS } from './limits.js';
 
-export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts', 'src/beyondplay-audio.ts', 'src/beyondplay-hud.tsx', 'src/beyondplay-anim.ts', 'src/beyondplay-characters.ts', 'src/beyondplay-avatar.ts', 'src/avatar-kit.ts', 'src/beyondplay-save.ts', 'src/beyondplay-store.ts'];
+export const CONTRACT_FILES = ['index.html', 'src/main.tsx', 'src/beyondplay-kit.ts', 'src/cobi-kit.ts', 'src/beyondplay-audio.ts', 'src/beyondplay-hud.tsx', 'src/beyondplay-anim.ts', 'src/beyondplay-characters.ts', 'src/beyondplay-avatar.ts', 'src/avatar-kit.ts', 'src/crowd-copy.ts', 'src/beyondplay-save.ts', 'src/beyondplay-store.ts'];
 /** Contract files a game may ship without: added after the first games were scaffolded, so absence is drift, not an error. */
-export const OPTIONAL_CONTRACT_FILES = new Set(['src/cobi-kit.ts', 'src/beyondplay-audio.ts', 'src/beyondplay-hud.tsx', 'src/beyondplay-anim.ts', 'src/beyondplay-characters.ts', 'src/beyondplay-avatar.ts', 'src/avatar-kit.ts', 'src/beyondplay-save.ts', 'src/beyondplay-store.ts']);
+export const OPTIONAL_CONTRACT_FILES = new Set(['src/cobi-kit.ts', 'src/beyondplay-audio.ts', 'src/beyondplay-hud.tsx', 'src/beyondplay-anim.ts', 'src/beyondplay-characters.ts', 'src/beyondplay-avatar.ts', 'src/avatar-kit.ts', 'src/crowd-copy.ts', 'src/beyondplay-save.ts', 'src/beyondplay-store.ts']);
 /** Starter files the template ships for the game to replace; never compared. */
 export const STARTER_FILES = new Set(['src/App.tsx', 'src/game.ts', 'src/beyondplay.config.ts', 'smoke.driver.mjs', 'src/viewport.ts', 'src/keys.ts']);
 

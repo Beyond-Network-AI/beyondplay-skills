@@ -22,8 +22,9 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/cobi-kit.ts` | platform | `CobiKit`: builds the shared bull from the kit on the asset host (section 9). Import it; do not edit it. |
 | `src/beyondplay-anim.ts` | platform | `loadClips`, `Animator`: clip packs for the shared bull kit and cross-faded animation states (section 5c). Import it; do not edit it. |
 | `src/beyondplay-characters.ts` | platform | `loadCharacter`, `loadClip`, `clipsFor`, `loadDance`: the library's rigged characters and their moves, from the asset host (section 5c). Import it; do not edit it. |
-| `src/beyondplay-avatar.ts` | platform | `loadPlayerAvatar`, `onPlayerAvatarChange`, `loadAvatar`, `DEFAULT_AVATAR`: the player's avatar in any kit the game declared, loaded with its moves; `loadRoomAvatars`, `loadOpponentAvatar`: the other players' (section 5c). Import it; do not edit it. |
+| `src/beyondplay-avatar.ts` | platform | `loadPlayerAvatar`, `onPlayerAvatarChange`, `loadAvatar`, `DEFAULT_AVATAR`: the player's avatar in any kit the game declared, loaded with its moves; `loadRoomAvatars`, `loadOpponentAvatar`: the other players' (section 5c), with `crowd: true` each in one draw call. Import it; do not edit it. |
 | `src/avatar-kit.ts` | platform | `AvatarKit`, `Avatar`: every BeyondPlay avatar (the two Beyonders, the ape, the platform bull and bear) in its own whole looks (the Beyonders by colour only), and a holder's COBI bull as minted with its collection's wearables, on one skeleton with shared moves and four attachment points (section 5c). Synced from the games repository; import it, do not edit it. |
+| `src/crowd-copy.ts` | platform | `crowdCopyOf(root)`: an avatar drawn in ONE draw call, its parts merged into one mesh and one material on the same bones (section 5c). Used by `loadRoomAvatars({ crowd: true })`. Synced from the games repository; import it, do not edit it. |
 | `src/beyondplay-save.ts` | platform | `loadSave`, `writeSave`, `flushSave`: progress that follows the player (section 5e). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
 | `src/index.css` | platform | Reset, dark background, no text selection, no tap highlight. |
@@ -435,9 +436,14 @@ and scenery may be built from shapes. The runner starter (section 5d) already pl
   carries) and `loaded`, the look they chose; in a duel, `await loadOpponentAvatar()` is the opponent's,
   once both players accepted it. Both are empty or null in a bot match, signed out, outside a published
   game and when the host does not answer in time, and a look that fails to load is left out: draw a
-  stand-in for any seat not listed, and bots always. Each costs what the hero does, so the budget above
-  decides how many to show whole (`max` loads only the first few); draw the rest as stand-ins. A
-  holder's own token is never another player's traits in your game: it arrives as the platform's bull.
+  stand-in for any seat not listed, and bots always. Shown whole, each costs what the hero does, so pass
+  `crowd: true` for everyone but the hero: each other player is then its one-draw crowd copy
+  (`src/crowd-copy.ts`), every part merged into one mesh with one material on the same bones, so it costs
+  ONE draw call (instead of 2 to 12) with the same triangles, colours, shine and glow, the same root, bones,
+  clips and points (some texture detail and soft see-through edges are lost). Release it with the avatar
+  (`loaded.crowd?.release()`); a look that cannot be copied stays whole (`crowd` absent). `max` still caps how
+  many load. A holder's own token is never another player's traits in your game: it arrives as the
+  platform's bull.
 
 ### Characters and moves from the library
 
