@@ -24,6 +24,12 @@
 //   const others = await loadRoomAvatars();   // [] in a bot match, signed out, or outside a room
 //   for (const p of others) seatAt(p.seat).add(p.loaded.character.root);
 //
+// With `crowd: true` each other player is drawn as its one-draw crowd copy (src/crowd-copy.ts): every part merged into
+// one mesh with one material on the same bones, so a player costs ONE draw call instead of 2 to 12, with every triangle,
+// its colours, its shine and its glow kept (some texture detail and soft see-through edges are lost). The same root,
+// bones, clips and points; release the copy with the avatar (`loaded.crowd?.release()`). Use it for every player who is
+// not the hero: a room of four players in rich looks is otherwise about 40 draw calls of the 60.
+//
 // NFT avatars: a holder who chose their own token (a COBI bull) is answered as its collection and traits
 // (`avatar.avatarKit = { collection: 'cobi', traits }`), and built here exactly as minted by the collection's own kit,
 // playing the bull's moves; `character.meta.collection` names it. A game built before the avatar kit, or one where the
@@ -33,6 +39,7 @@ import type * as THREE from 'three';
 
 import { AvatarKit, type Avatar } from './avatar-kit';
 import { clipsFor, loadCharacter, openLibrary, type LibraryCharacter } from './beyondplay-characters';
+import { crowdCopyOf, type CrowdMesh } from './crowd-copy';
 import { onAvatarChange, opponentAvatar, request, roomAvatars, type PlayerAvatar, type PlayerAvatarCollectible, type PlayerAvatarLook } from './beyondplay-platform';
 
 /** The look every player has until they choose, and the one a game shows when no host answers. */
@@ -50,6 +57,10 @@ export interface LoadedAvatar {
   /** The avatar kit's avatar, when the platform named the look there (`avatar.avatarKit`): `point('rightHand')`,
    *  `wearLook(id)`, `release()`. Absent for a library character. */
   kitAvatar?: Avatar;
+  /** Its one-draw crowd copy (src/crowd-copy.ts), when it was loaded with `crowd: true` and could be copied: already in
+   *  `character.root` in place of its parts. `release()` it when the avatar leaves the game (and `kitAvatar.release()`
+   *  as always). It shows the look as it was when copied: a later `wearLook` or `setFur` does not reach it. */
+  crowd?: CrowdMesh;
 }
 
 export interface LoadAvatarOptions {
@@ -175,6 +186,9 @@ export interface LoadOthersOptions {
   lite?: boolean;
   /** How long to wait for the host (ms); after it, nothing (draw the seats your own way). */
   timeoutMs?: number;
+  /** Draw each one as its one-draw crowd copy (one draw call instead of one per part; `loaded.crowd`). A look that
+   *  cannot be copied stays whole (`crowd` absent). */
+  crowd?: boolean;
 }
 
 /** The running play's match, as the host gave it (null outside a host). */
@@ -188,21 +202,29 @@ function inTime<T>(asked: Promise<T | null>, timeoutMs = 4000): Promise<T | null
   return Promise.race([asked.catch(() => null), late]);
 }
 
-/** One answer loaded, or null when it fails to load (the game draws its own stand-in for that player). */
-async function loadOrNull(avatar: PlayerAvatar, opts: { lite?: boolean }): Promise<LoadedAvatar | null> {
+/** One answer loaded (as its crowd copy with `crowd`, where it can be copied), or null when it fails to load (the game
+ *  draws its own stand-in for that player). */
+async function loadOrNull(avatar: PlayerAvatar, opts: { lite?: boolean; crowd?: boolean }): Promise<LoadedAvatar | null> {
+  let loaded: LoadedAvatar;
   try {
-    return await loadAvatar(avatar, opts);
+    loaded = await loadAvatar(avatar, opts);
   } catch {
     return null;
   }
+  if (opts.crowd) {
+    // (a look that cannot be copied, or a copy that fails, stays whole: crowdCopyOf changes nothing until it succeeds)
+    const copy = await crowdCopyOf(loaded.character.root).catch(() => null);
+    if (copy) loaded.crowd = copy;
+  }
+  return loaded;
 }
 
 /** Everyone else in the live room the game is playing (`match.live.roomId`), loaded, in seat order: each the look they
  *  chose, as their own game shows it (in a creator's game a holder's own token arrives as the platform's bull). Empty in
  *  a bot match, outside a room, signed out, from a host that predates it, or when it does not answer in time. Bots are
  *  never in it, and a player whose look fails to load is left out: draw a stand-in for any seat not listed. `max`
- *  loads only the first that many in seat order (the 3D budget: each costs what the hero does); `withYou` lists this
- *  player too (`you: true`); `roomId` names the room yourself. */
+ *  loads only the first that many in seat order (the 3D budget: each costs what the hero does, one draw call each with
+ *  `crowd`); `withYou` lists this player too (`you: true`); `roomId` names the room yourself. */
 export async function loadRoomAvatars(opts: LoadOthersOptions & { withYou?: boolean; roomId?: string; max?: number } = {}): Promise<LoadedRoomPlayer[]> {
   const roomId = opts.roomId ?? text(currentMatch()?.live?.roomId);
   if (!roomId) return [];
