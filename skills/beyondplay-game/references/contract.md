@@ -414,7 +414,7 @@ anim.setSpeed('run', speed / 8.5); anim.update(dt); // every frame, on the rende
 In a 3D game where the player controls a character, the hero is the player, as the look they chose in
 the app. Use another character only when the creator names one; never build the hero from shapes.
 People and animals come from the library; creatures it lacks (aliens, slimes, drones), vehicles, props
-and scenery may be built from shapes. A game started from a starter keeps the starter's hero.
+and scenery may be built from shapes. The runner starter (section 5d) already plays the player's avatar.
 
 - Declare every avatar kit, so the player shows as whatever they chose: `uses: ['player.avatar:beyonder',
   'player.avatar:ape', 'player.avatar:bull', 'player.avatar:bear']` on `defineSoloGame`. Without it the
@@ -425,11 +425,11 @@ and scenery may be built from shapes. A game started from a starter keeps the st
   (`kitAvatar?.release()`) once its replacement is on screen and when the hero goes. A local run shows
   the pink Beyonder; the platform answers only a published game.
 - The game owns the hitbox: one fixed capsule or box for every avatar, never sized from the model. Every
-  avatar is 1.6 to 1.9 m tall, feet at y = 0, facing +Z; moves play in place.
+  avatar is about 1.75 to 2 m tall, feet at y = 0, facing +Z; moves play in place.
 - Budget: with every character loaded, the scene stays inside the 3D budget (at most 60 draw calls and
-  300k triangles; `npm run smoke:perf` measures it). A character costs up to about 14 draw calls (a
-  dressed ape; a holder's bull built from its traits 5 to 12) and about 15,000 triangles: give the
-  world at most 30 draw calls and the characters the other 30, the hero and one or two others.
+  300k triangles; `npm run smoke:perf` measures it). A character costs 2 to 10 draw calls and about
+  15,000 to 60,000 triangles (a Beyonder is the lightest, a dressed ape the heaviest): give the world
+  at most 30 draw calls and 150k triangles, and the characters the rest, the hero and one or two others.
 
 ### Characters and moves from the library
 
@@ -492,7 +492,7 @@ import { Animator } from './beyondplay-anim';
 
 const avatars = await AvatarKit.load();
 const me = await avatars.build({ body: 'beyonder-f', look: 'pink' });   // a whole look; an ape: { body: 'ape', look: 'ape-07' }
-scene.add(me.root);                                                      // 1.6 to 1.9 m, feet at y = 0, faces +Z
+scene.add(me.root);                                                      // about 1.75 to 2 m, feet at y = 0, faces +Z
 const clips = await me.clips(['idle', 'walk', 'run', 'jump', 'wave', 'dance-ymca']);
 const anim = new Animator(me.root, clips, { idle: { clip: 'idle' }, run: { clip: 'run' } });
 await me.wearLook('gold');                // another whole look (hers: a colour; an ape's brings its fur)
@@ -522,11 +522,14 @@ const bull = await avatars.build({ collection: 'cobi', traits: item.traits, wear
 `npm run new-game -- <slug> "Name" --starter runner` lays a genre starter over the template: a
 complete game of that genre that passes the ladder as scaffolded, with its engine
 (`src/game.ts`), its scene (`src/scene.ts`), the shell, the check driver, a sound set and a music
-loop from the asset library (credited in `CREDITS.md`), the HUD kit and the animated bull. Start
-from the starter that is nearest your idea and change it; keep its shape.
+loop from the asset library (credited in `CREDITS.md`), the HUD kit and the player's own avatar,
+animated. Start from the starter that is nearest your idea and change it; keep its shape.
 
 - `runner`: three lanes, obstacles to dodge, jump or slide under, coins, sixty seconds or three
-  hits. three.js, 15 draw calls, about 28,000 triangles with the bull.
+  hits. The runner is the player's own avatar (`loadPlayerAvatar`, every avatar kit declared), playing
+  the runner's sprint, jump, slide, hit and knockout made for the bull, fitted to its body with
+  `me.kitAvatar.fit(...)`. three.js; measured with five looks, 8 to 16 draw calls and 18,000 to 42,000
+  triangles (the heaviest dressed apes add about 20,000 more).
 
 ## 5e. Saved progress
 

@@ -13,9 +13,10 @@
 
 import type { CapabilityName } from './beyondplay-platform';
 
-/** One entry of `uses`: a capability name, or player.items with the one collection the game
- *  asks for ('player.items:cobi'). The manifest carries the entries verbatim. */
-export type UsesEntry = CapabilityName | `player.items:${string}`;
+/** One entry of `uses`: a capability name, player.items with the one collection the game asks
+ *  for ('player.items:cobi'), or player.avatar with one avatar kit it shows ('player.avatar:ape';
+ *  one entry per kit). The manifest carries the entries verbatim. */
+export type UsesEntry = CapabilityName | `player.items:${string}` | `player.avatar:${string}`;
 
 export type SortableSeed = boolean;
 export type InstanceKind = 'static' | 'daily' | 'random' | 'rotating';

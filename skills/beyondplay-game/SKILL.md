@@ -66,8 +66,8 @@ in the app (a Beyonder, an ape, a bull or a bear), loaded with
 declared in `uses` (`player.avatar:beyonder`, `player.avatar:ape`,
 `player.avatar:bull`, `player.avatar:bear`). Use another character only when
 the creator names one, and never build the hero from shapes; creatures the
-library lacks may be (contract section 5c). A game started from a starter
-keeps the starter's hero.
+library lacks may be (contract section 5c). The runner starter already plays
+the player's avatar.
 
 ## Steps
 
