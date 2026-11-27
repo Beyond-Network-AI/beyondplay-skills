@@ -67,7 +67,9 @@ declared in `uses` (`player.avatar:beyonder`, `player.avatar:ape`,
 `player.avatar:bull`, `player.avatar:bear`). Use another character only when
 the creator names one, and never build the hero from shapes; creatures the
 library lacks may be (contract section 5c). The runner starter already plays
-the player's avatar.
+the player's avatar. Other players are their own avatars too: everyone in a
+live room with `loadRoomAvatars()`, a duel's opponent with
+`loadOpponentAvatar()`; bots are drawn the game's own way.
 
 ## Steps
 

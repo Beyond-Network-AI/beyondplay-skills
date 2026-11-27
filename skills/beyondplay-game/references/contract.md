@@ -22,7 +22,7 @@ After `npm run new-game -- <slug> "Display Name"`:
 | `src/cobi-kit.ts` | platform | `CobiKit`: builds the shared bull from the kit on the asset host (section 9). Import it; do not edit it. |
 | `src/beyondplay-anim.ts` | platform | `loadClips`, `Animator`: clip packs for the shared bull kit and cross-faded animation states (section 5c). Import it; do not edit it. |
 | `src/beyondplay-characters.ts` | platform | `loadCharacter`, `loadClip`, `clipsFor`, `loadDance`: the library's rigged characters and their moves, from the asset host (section 5c). Import it; do not edit it. |
-| `src/beyondplay-avatar.ts` | platform | `loadPlayerAvatar`, `onPlayerAvatarChange`, `loadAvatar`, `DEFAULT_AVATAR`: the player's avatar in any kit the game declared, loaded with its moves (section 5c). Import it; do not edit it. |
+| `src/beyondplay-avatar.ts` | platform | `loadPlayerAvatar`, `onPlayerAvatarChange`, `loadAvatar`, `DEFAULT_AVATAR`: the player's avatar in any kit the game declared, loaded with its moves; `loadRoomAvatars`, `loadOpponentAvatar`: the other players' (section 5c). Import it; do not edit it. |
 | `src/avatar-kit.ts` | platform | `AvatarKit`, `Avatar`: every BeyondPlay avatar (the two Beyonders, the ape, the platform bull and bear) in its own whole looks (the Beyonders by colour only), and a holder's COBI bull as minted with its collection's wearables, on one skeleton with shared moves and four attachment points (section 5c). Synced from the games repository; import it, do not edit it. |
 | `src/beyondplay-save.ts` | platform | `loadSave`, `writeSave`, `flushSave`: progress that follows the player (section 5e). Import it; do not edit it. |
 | `src/webkit-image-hardening.ts` | platform | Heals blank `drawImage` on WKWebView. Installed by `main.tsx`. |
@@ -430,6 +430,13 @@ and scenery may be built from shapes. The runner starter (section 5d) already pl
   300k triangles; `npm run smoke:perf` measures it). A character costs 2 to 10 draw calls and about
   15,000 to 60,000 triangles (a Beyonder is the lightest, a dressed ape the heaviest): give the world
   at most 30 draw calls and 150k triangles, and the characters the rest, the hero and one or two others.
+- Other players are their own avatars too. In a live room, `await loadRoomAvatars()` is everyone else
+  in it, in seat order, each with the room's `playerId` and `seat` (the ones `match.live.players`
+  carries) and `loaded`, the look they chose; in a duel, `await loadOpponentAvatar()` is the opponent's.
+  Both are empty or null in a bot match, signed out, outside a published game and when the host does
+  not answer in time: draw those seats your own way, and bots always. Pass `lite: true` for more than
+  two or three at once, and keep inside the budget above (each costs what the hero does). A holder's
+  own token is never another player's traits in your game: it arrives as the platform's bull.
 
 ### Characters and moves from the library
 
@@ -767,7 +774,7 @@ does not list.
 | `player.stats` | open | | `{ best, plays, lastPlayedAt }` for this game, or `null` when signed out; what the leaderboard already shows. |
 | `player.friends` | open | | `[{ displayName, avatar, best }]` for friends who played this game, or `null` when signed out. No ids, no items, no lookup by player. |
 | `player.save` | open | `{ op: 'get' }` or `{ op: 'set', data }` | `{ data, updatedAt }` for a read, `{ ok, updatedAt }` for a write, or `null` when signed out. One JSON value per player per game, at most 16 KB, private to that player. Use `src/beyondplay-save.ts` (section 5e). |
-| `player.avatar` | open | `{ kit }` | `{ kit, id, look, source, model, avatarKit? }`: the player's avatar in the kit declared as `player.avatar:<kit>` (`uses: ['player.avatar:ape']`), the same look in every game, answered signed out too with the platform's pick. `id` is the library character (`ape-07`): load it with `loadCharacter(id)` from `src/beyondplay-characters.ts`, or `model.url`. `avatarKit` is the same look in `src/avatar-kit.ts`: `{ body, look }` for a platform look, `{ collection, traits }` for a holder's own token (a COBI bull, built as minted; `id`, `look` and `model` then name `bull-01` for a game that cannot build it); `loadPlayerAvatar()` builds whichever applies. Look only; never a token id. |
+| `player.avatar` | open | `{ kit }`; `{ room, kit? }` or `{ challenge, kit? }` for other players | With `{ room }` (`match.live.roomId`): `{ players: [{ playerId, seat, you, avatar }] }`, everyone in the live room the game is in, in seat order, by the room's own ids (bots are not in it); with `{ challenge }` (`match.challengeId`): `{ opponent }`, the duel's opponent or `null`. Both signed in only, `null` outside that room or duel; each `avatar` is the answer below, in a creator's game always a platform look; `loadRoomAvatars` and `loadOpponentAvatar` load them. Otherwise `{ kit, id, look, source, model, avatarKit? }`: the player's avatar in the kit declared as `player.avatar:<kit>` (`uses: ['player.avatar:ape']`), the same look in every game, answered signed out too with the platform's pick. `id` is the library character (`ape-07`): load it with `loadCharacter(id)` from `src/beyondplay-characters.ts`, or `model.url`. `avatarKit` is the same look in `src/avatar-kit.ts`: `{ body, look }` for a platform look, `{ collection, traits }` for a holder's own token (a COBI bull, built as minted; `id`, `look` and `model` then name `bull-01` for a game that cannot build it); `loadPlayerAvatar()` builds whichever applies. Look only; never a token id. |
 | `store` | open | `{ op: 'items' }` or `{ op: 'buy', item, wait? }` | For `items`: `[{ id, name, blurb, image, price, onSale, owned }]`, the items declared with `defineStore`. For `buy`: `{ outcome: 'bought' \| 'owned' }` once the player owns the item; rejects with `cancelled` when the player closes the platform's sheet. Use `src/beyondplay-store.ts` (section 5f). |
 
 Tiers: `open` is answered without asking the player, which covers
