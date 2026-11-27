@@ -65,8 +65,9 @@ in the app (a Beyonder, an ape, a bull or a bear), loaded with
 `loadPlayerAvatar()` from `src/beyondplay-avatar.ts` with every avatar kit
 declared in `uses` (`player.avatar:beyonder`, `player.avatar:ape`,
 `player.avatar:bull`, `player.avatar:bear`). Use another character only when
-the creator names one, and never build a character from shapes (contract
-section 5c).
+the creator names one, and never build the hero from shapes; creatures the
+library lacks may be (contract section 5c). A game started from a starter
+keeps the starter's hero.
 
 ## Steps
 
