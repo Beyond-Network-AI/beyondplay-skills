@@ -188,29 +188,32 @@ function inTime<T>(asked: Promise<T | null>, timeoutMs = 4000): Promise<T | null
   return Promise.race([asked.catch(() => null), late]);
 }
 
-/** One answer loaded, or the default look when its own fails to load (null when even that fails). */
-async function loadOrDefault(avatar: PlayerAvatar, opts: { lite?: boolean }): Promise<LoadedAvatar | null> {
+/** One answer loaded, or null when it fails to load (the game draws its own stand-in for that player). */
+async function loadOrNull(avatar: PlayerAvatar, opts: { lite?: boolean }): Promise<LoadedAvatar | null> {
   try {
     return await loadAvatar(avatar, opts);
   } catch {
-    return loadAvatar(DEFAULT_AVATAR, opts).catch(() => null);
+    return null;
   }
 }
 
 /** Everyone else in the live room the game is playing (`match.live.roomId`), loaded, in seat order: each the look they
  *  chose, as their own game shows it (in a creator's game a holder's own token arrives as the platform's bull). Empty in
  *  a bot match, outside a room, signed out, from a host that predates it, or when it does not answer in time. Bots are
- *  never in it. `withYou` lists this player too (`you: true`); `roomId` names the room yourself. */
-export async function loadRoomAvatars(opts: LoadOthersOptions & { withYou?: boolean; roomId?: string } = {}): Promise<LoadedRoomPlayer[]> {
+ *  never in it, and a player whose look fails to load is left out: draw a stand-in for any seat not listed. `max`
+ *  loads only the first that many in seat order (the 3D budget: each costs what the hero does); `withYou` lists this
+ *  player too (`you: true`); `roomId` names the room yourself. */
+export async function loadRoomAvatars(opts: LoadOthersOptions & { withYou?: boolean; roomId?: string; max?: number } = {}): Promise<LoadedRoomPlayer[]> {
   const roomId = opts.roomId ?? text(currentMatch()?.live?.roomId);
   if (!roomId) return [];
   const players = await inTime(roomAvatars(roomId, opts.kit), opts.timeoutMs);
   if (!players) return [];
+  const wanted = players.filter((p) => opts.withYou || !p.you);
   const loaded = await Promise.all(
-    players
-      .filter((p) => opts.withYou || !p.you)
+    wanted
+      .slice(0, opts.max === undefined ? wanted.length : Math.max(0, Math.floor(opts.max)))
       .map(async (p) => {
-        const avatar = await loadOrDefault(p.avatar, opts);
+        const avatar = await loadOrNull(p.avatar, opts);
         return avatar ? { playerId: p.playerId, seat: p.seat, you: p.you, loaded: avatar } : null;
       }),
   );
@@ -218,11 +221,11 @@ export async function loadRoomAvatars(opts: LoadOthersOptions & { withYou?: bool
 }
 
 /** A duel's opponent (`match.challengeId`), loaded: the look they chose, always a platform look. Null outside a duel,
- *  before anyone else is in it, when either player blocked the other, signed out, from a host that predates it, or when
- *  it does not answer in time. `challengeId` names the duel yourself. */
+ *  before both players accepted it, signed out, from a host that predates it, when it does not answer in time or when
+ *  the look fails to load. `challengeId` names the duel yourself. */
 export async function loadOpponentAvatar(opts: LoadOthersOptions & { challengeId?: string } = {}): Promise<LoadedAvatar | null> {
   const challengeId = opts.challengeId ?? text(currentMatch()?.challengeId);
   if (!challengeId) return null;
   const avatar = await inTime(opponentAvatar(challengeId, opts.kit), opts.timeoutMs);
-  return avatar ? loadOrDefault(avatar, opts) : null;
+  return avatar ? loadOrNull(avatar, opts) : null;
 }

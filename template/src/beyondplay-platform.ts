@@ -339,9 +339,9 @@ export async function roomAvatars(roomId: string, kit?: string): Promise<RoomPla
   ).map((p) => ({ playerId: p.playerId, seat: p.seat, you: p.you === true, avatar: p.avatar }));
 }
 
-/** A duel's opponent (`match.challengeId`) over the kits the game declared: null before anyone else is in the duel,
- *  when either player blocked the other, signed out, or from a host that predates it. Always a platform look (a
- *  holder's own token arrives as the platform's bull). */
+/** A duel's opponent (`match.challengeId`) over the kits the game declared, once both players accepted the duel (and
+ *  after it ends): null before then, outside the duel, signed out, or from a host that predates it. Always a platform
+ *  look (a holder's own token arrives as the platform's bull). */
 export async function opponentAvatar(challengeId: string, kit?: string): Promise<PlayerAvatar | null> {
   const result = (await askOthers({ challenge: challengeId }, kit)) as { opponent?: unknown } | null;
   return result && isAnswer(result.opponent) ? result.opponent : null;
