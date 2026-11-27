@@ -298,11 +298,53 @@ export function onCapabilities(cb: (names: string[]) => void): () => void {
 
 /** Called with the player's new look when it changes while the game runs (they saved another avatar in the locker
  *  and came back): `avatar` is a fresh player.avatar answer, `params` what the game asked with. Older hosts never
- *  call it. Returns an unsubscribe function. */
+ *  call it. Returns an unsubscribe function. Only the player's own avatar: never another player's (roomAvatars,
+ *  opponentAvatar). */
 export function onAvatarChange(cb: (avatar: PlayerAvatar | null, params: PlayerAvatarParams) => void): () => void {
   const api = bridge();
   if (!api || typeof api.onAvatarChange !== 'function') return () => {};
-  return api.onAvatarChange(cb) as () => void;
+  return api.onAvatarChange((avatar: PlayerAvatar | null, params: Record<string, unknown> | undefined) => {
+    if (params && (params.room !== undefined || params.challenge !== undefined)) return;
+    cb(avatar, params as unknown as PlayerAvatarParams);
+  }) as () => void;
+}
+
+/** One player of the live room the game is in, as `roomAvatars` answers them: the room's own player id and seat (the
+ *  ones `match.live.players` carries) and their avatar, the same answer their own game gets (in a creator's game a
+ *  holder's own token arrives as a platform look). Bots are not players: draw them your own way. */
+export interface RoomPlayerAvatar {
+  playerId: string;
+  seat: number;
+  /** This player. */
+  you: boolean;
+  avatar: PlayerAvatar;
+}
+
+const isAnswer = (v: unknown): v is PlayerAvatar =>
+  !!v && typeof v === 'object' && typeof (v as PlayerAvatar).kit === 'string' && typeof (v as PlayerAvatar).id === 'string' && !!(v as PlayerAvatar).look;
+
+/** Asks player.avatar for other players (`{ room }` or `{ challenge }`), with the game's kit when given. */
+function askOthers(params: { room: string } | { challenge: string }, kit?: string): Promise<unknown> {
+  return request('player.avatar', { ...params, ...(kit ? { kit } : {}) } as unknown as PlayerAvatarParams) as Promise<unknown>;
+}
+
+/** Everyone in the live room the game is in (`match.live.roomId`), in seat order, over the kits the game declared
+ *  (`kit`: one of them). Signed in only: null outside the room, signed out, from a host that predates it, or with no
+ *  room (a bot match). Rejects like request() (denied for a kit the game did not declare). */
+export async function roomAvatars(roomId: string, kit?: string): Promise<RoomPlayerAvatar[] | null> {
+  const result = (await askOthers({ room: roomId }, kit)) as { players?: unknown } | null;
+  if (!result || !Array.isArray(result.players)) return null;
+  return (result.players as RoomPlayerAvatar[]).filter(
+    (p) => !!p && typeof p.playerId === 'string' && typeof p.seat === 'number' && isAnswer(p.avatar),
+  ).map((p) => ({ playerId: p.playerId, seat: p.seat, you: p.you === true, avatar: p.avatar }));
+}
+
+/** A duel's opponent (`match.challengeId`) over the kits the game declared, once both players accepted the duel (and
+ *  after it ends): null before then, outside the duel, signed out, or from a host that predates it. Always a platform
+ *  look (a holder's own token arrives as the platform's bull). */
+export async function opponentAvatar(challengeId: string, kit?: string): Promise<PlayerAvatar | null> {
+  const result = (await askOthers({ challenge: challengeId }, kit)) as { opponent?: unknown } | null;
+  return result && isAnswer(result.opponent) ? result.opponent : null;
 }
 
 /** True when the error is a CapabilityError with the given code. */

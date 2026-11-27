@@ -18,6 +18,12 @@
 // looks). The same `character.root`, `clips(names)` and moves; release it with `kitAvatar.release()` when done. Should
 // the avatar kit fail to load, the library character below is shown as before.
 //
+// Other players: loadRoomAvatars() is everyone else in the live room the game is playing (each their own look, by the
+// room's player id and seat), loadOpponentAvatar() a duel's opponent. Bots are not players: draw them your own way.
+//
+//   const others = await loadRoomAvatars();   // [] in a bot match, signed out, or outside a room
+//   for (const p of others) seatAt(p.seat).add(p.loaded.character.root);
+//
 // NFT avatars: a holder who chose their own token (a COBI bull) is answered as its collection and traits
 // (`avatar.avatarKit = { collection: 'cobi', traits }`), and built here exactly as minted by the collection's own kit,
 // playing the bull's moves; `character.meta.collection` names it. A game built before the avatar kit, or one where the
@@ -27,7 +33,7 @@ import type * as THREE from 'three';
 
 import { AvatarKit, type Avatar } from './avatar-kit';
 import { clipsFor, loadCharacter, openLibrary, type LibraryCharacter } from './beyondplay-characters';
-import { onAvatarChange, request, type PlayerAvatar, type PlayerAvatarCollectible, type PlayerAvatarLook } from './beyondplay-platform';
+import { onAvatarChange, opponentAvatar, request, roomAvatars, type PlayerAvatar, type PlayerAvatarCollectible, type PlayerAvatarLook } from './beyondplay-platform';
 
 /** The look every player has until they choose, and the one a game shows when no host answers. */
 export const DEFAULT_AVATAR: PlayerAvatar = { kit: 'beyonder', id: 'beyonder-pink', look: { preset: 'pink' }, source: 'default', model: null };
@@ -151,4 +157,75 @@ export function onPlayerAvatarChange(cb: (next: LoadedAvatar) => void, opts: { k
     if (!avatar || (opts.kit && params?.kit && params.kit !== opts.kit)) return;
     void loadAvatar(avatar, opts).then(cb).catch(() => undefined);
   });
+}
+
+/** Another player in the live room, loaded: the room's player id and seat (as `match.live.players` has them). */
+export interface LoadedRoomPlayer {
+  playerId: string;
+  seat: number;
+  /** This player (listed only with `withYou`). */
+  you: boolean;
+  loaded: LoadedAvatar;
+}
+
+export interface LoadOthersOptions {
+  /** One kit the game declared; without it, the avatar rule over every kit it declared (each player's own look). */
+  kit?: string;
+  /** The library characters' lighter copies where the library has them (a look built in the avatar kit has none). */
+  lite?: boolean;
+  /** How long to wait for the host (ms); after it, nothing (draw the seats your own way). */
+  timeoutMs?: number;
+}
+
+/** The running play's match, as the host gave it (null outside a host). */
+function currentMatch(): { challengeId?: unknown; live?: { roomId?: unknown } | null } | null {
+  return typeof window === 'undefined' ? null : ((window as any).BeyondPlay?.match ?? null);
+}
+
+/** The host's answer, or null when none comes in time. */
+function inTime<T>(asked: Promise<T | null>, timeoutMs = 4000): Promise<T | null> {
+  const late = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+  return Promise.race([asked.catch(() => null), late]);
+}
+
+/** One answer loaded, or null when it fails to load (the game draws its own stand-in for that player). */
+async function loadOrNull(avatar: PlayerAvatar, opts: { lite?: boolean }): Promise<LoadedAvatar | null> {
+  try {
+    return await loadAvatar(avatar, opts);
+  } catch {
+    return null;
+  }
+}
+
+/** Everyone else in the live room the game is playing (`match.live.roomId`), loaded, in seat order: each the look they
+ *  chose, as their own game shows it (in a creator's game a holder's own token arrives as the platform's bull). Empty in
+ *  a bot match, outside a room, signed out, from a host that predates it, or when it does not answer in time. Bots are
+ *  never in it, and a player whose look fails to load is left out: draw a stand-in for any seat not listed. `max`
+ *  loads only the first that many in seat order (the 3D budget: each costs what the hero does); `withYou` lists this
+ *  player too (`you: true`); `roomId` names the room yourself. */
+export async function loadRoomAvatars(opts: LoadOthersOptions & { withYou?: boolean; roomId?: string; max?: number } = {}): Promise<LoadedRoomPlayer[]> {
+  const roomId = opts.roomId ?? text(currentMatch()?.live?.roomId);
+  if (!roomId) return [];
+  const players = await inTime(roomAvatars(roomId, opts.kit), opts.timeoutMs);
+  if (!players) return [];
+  const wanted = players.filter((p) => opts.withYou || !p.you);
+  const loaded = await Promise.all(
+    wanted
+      .slice(0, opts.max === undefined ? wanted.length : Math.max(0, Math.floor(opts.max)))
+      .map(async (p) => {
+        const avatar = await loadOrNull(p.avatar, opts);
+        return avatar ? { playerId: p.playerId, seat: p.seat, you: p.you, loaded: avatar } : null;
+      }),
+  );
+  return loaded.filter((p): p is LoadedRoomPlayer => p !== null);
+}
+
+/** A duel's opponent (`match.challengeId`), loaded: the look they chose, always a platform look. Null outside a duel,
+ *  before both players accepted it, signed out, from a host that predates it, when it does not answer in time or when
+ *  the look fails to load. `challengeId` names the duel yourself. */
+export async function loadOpponentAvatar(opts: LoadOthersOptions & { challengeId?: string } = {}): Promise<LoadedAvatar | null> {
+  const challengeId = opts.challengeId ?? text(currentMatch()?.challengeId);
+  if (!challengeId) return null;
+  const avatar = await inTime(opponentAvatar(challengeId, opts.kit), opts.timeoutMs);
+  return avatar ? loadOrNull(avatar, opts) : null;
 }
