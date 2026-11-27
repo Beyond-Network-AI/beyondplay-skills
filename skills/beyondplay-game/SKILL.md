@@ -59,6 +59,15 @@ verdict per feature: allowed, conditional or not, each with the platform's
 alternative. Relay the verdicts to the creator and agree the idea before you
 scaffold. Without the MCP, apply the hard rules below yourself and say so.
 
+Name the hero when you agree the idea. In a 3D game where the player controls
+a character, the hero is the player, as their own avatar: the look they chose
+in the app (a Beyonder, an ape, a bull or a bear), loaded with
+`loadPlayerAvatar()` from `src/beyondplay-avatar.ts` with every avatar kit
+declared in `uses` (`player.avatar:beyonder`, `player.avatar:ape`,
+`player.avatar:bull`, `player.avatar:bear`). Use another character only when
+the creator names one, and never build a character from shapes (contract
+section 5c).
+
 ## Steps
 
 ### Set up the kit (once)
@@ -316,6 +325,7 @@ Breaking any of these ships a broken game or a rejected one.
 - [ ] No external requests in the network log beyond the platform and the template's font
 - [ ] No brand names or third-party IP; fan disclaimer present where required; no emoji
 - [ ] The asset library was searched first (`search_assets`, `add_asset` on the creator MCP); the game has a sound set and a music loop, played through `src/beyondplay-audio.ts`
+- [ ] A 3D game with a hero plays it as the player's own avatar (`loadPlayerAvatar`, every avatar kit declared in `uses`, a stand-in until it loads, one fixed hitbox), unless the creator named another character
 - [ ] 3D characters and their moves come from the library (`src/beyondplay-characters.ts`, contract section 5c), loaded from the asset host; no model or clip of the library is copied into the game
 - [ ] A BeyondPlay avatar (a Beyonder in one of its colours, the ape, the platform bull or bear, each in one of its whole looks) or a holder's COBI bull with its wearables comes from `src/avatar-kit.ts` (contract section 5c), never assembled by hand; clothes go only on the body whose wardrobe holds them, and never on a Beyonder.
 - [ ] Every asset and track is owned, CC0 or commercially licensed, and named in `CREDITS.md`; audio unlocks on a gesture
