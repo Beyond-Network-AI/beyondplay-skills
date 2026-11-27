@@ -409,6 +409,28 @@ anim.setSpeed('run', speed / 8.5); anim.update(dt); // every frame, on the rende
   copied into the game: `runner` (idle-neutral, run, run-jump, run-slide, hit-react, knockout,
   victory; 479 KB). Draw a stand-in until the character arrives; never hold the first frame for it.
 
+### The hero: the player's own avatar
+
+In a 3D game where the player controls a character, the hero is the player, as the look they chose in
+the app. Use another character only when the creator names one; never build the hero from shapes.
+People and animals come from the library; creatures it lacks (aliens, slimes, drones), vehicles, props
+and scenery may be built from shapes. A game started from a starter keeps the starter's hero.
+
+- Declare every avatar kit, so the player shows as whatever they chose: `uses: ['player.avatar:beyonder',
+  'player.avatar:ape', 'player.avatar:bull', 'player.avatar:bear']` on `defineSoloGame`. Without it the
+  platform answers nothing and every player gets the pink Beyonder.
+- `const me = await loadPlayerAvatar()` (`src/beyondplay-avatar.ts`), after the first frame; draw a
+  stand-in until it arrives and keep the stand-in if it never does. `onPlayerAvatarChange` swaps in a
+  new look while the game runs: ignore a load that finishes after a newer one, and release a look
+  (`kitAvatar?.release()`) once its replacement is on screen and when the hero goes. A local run shows
+  the pink Beyonder; the platform answers only a published game.
+- The game owns the hitbox: one fixed capsule or box for every avatar, never sized from the model. Every
+  avatar is 1.6 to 1.9 m tall, feet at y = 0, facing +Z; moves play in place.
+- Budget: with every character loaded, the scene stays inside the 3D budget (at most 60 draw calls and
+  300k triangles; `npm run smoke:perf` measures it). A character costs up to about 14 draw calls (a
+  dressed ape; a holder's bull built from its traits 5 to 12) and about 15,000 triangles: give the
+  world at most 30 draw calls and the characters the other 30, the hero and one or two others.
+
 ### Characters and moves from the library
 
 The library holds rigged characters and a set of moves for each, on the asset host; search it first
