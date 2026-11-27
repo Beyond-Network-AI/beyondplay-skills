@@ -16,8 +16,13 @@ export const challenge = defineChallenge({
 });
 
 // `uses` names the platform capabilities the game asks for through
-// src/beyondplay-platform.ts (request('share') on the end card here).
-export const game = defineSoloGame({ challenge, uses: ['share'] });
+// src/beyondplay-platform.ts: request('share') on the end card, and the player's
+// avatar in every avatar kit, so they run as whatever look they chose
+// (src/scene.ts loads it with loadPlayerAvatar).
+export const game = defineSoloGame({
+  challenge,
+  uses: ['share', 'player.avatar:beyonder', 'player.avatar:ape', 'player.avatar:bull', 'player.avatar:bear'],
+});
 
 // Phone and desktop (docs/display.md): a swipe or a tap on a phone, the keys
 // below on a desktop (src/App.tsx binds them). The camera follows the screen's

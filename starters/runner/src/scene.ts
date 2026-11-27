@@ -1,21 +1,28 @@
 // Runner starter scene: what the player sees. It reads the engine's state and
-// draws it; it never decides gameplay. The character is the shared bull kit,
-// loaded from the platform's asset host after the first frame (a stand-in runs
-// until it arrives), animated through the platform Animator.
+// draws it; it never decides gameplay. The runner is the player, as their own
+// avatar (src/beyondplay-avatar.ts: the look they chose in the app, a Beyonder,
+// an ape, a bull, a bear or their own COBI bull), loaded from the platform's
+// asset host after the first frame (a stand-in runs until it arrives) and
+// animated through the platform Animator: its own run, and the runner's jump,
+// slide, hit and knockout fitted to its body. The look never changes the run:
+// the engine's lanes and boxes are the same for every avatar.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Animator, loadClips } from './beyondplay-anim';
-import { CobiKit } from './cobi-kit';
+import { DEFAULT_AVATAR, loadPlayerAvatar, onPlayerAvatarChange, type LoadedAvatar } from './beyondplay-avatar';
+import type { PlayerAvatar } from './beyondplay-platform';
 import { HIGH, LOW, WALL, type RunnerGame } from './game';
 
 const LANE_W = 2.2;
 const AHEAD = 80;        // metres drawn in front of the runner
 const BEHIND = 8;
 const DASH = 8;          // metres per repeat of the road texture
-const KIT_BASE = 'https://assets.beyondplay.xyz/cobi/kit/v2/phone/';
-// The platform's default bull. A game that shows the player's own bull asks for
-// player.items and builds from the traits it is given (docs/player-items.md).
-const BULL = { Fur: 'Robot', Hooves: 'Classic', Eyes: 'Sunglasses', Horns: 'Upward', Clothes: 'Black Jeans' };
+// Where no host answers (a local run, the creator's preview), the pink Beyonder,
+// built by the avatar kit like every player's look. Published, the platform
+// answers player.avatar with the player's own (src/beyondplay.config.ts declares
+// every avatar kit).
+const LOCAL: PlayerAvatar = { ...DEFAULT_AVATAR, avatarKit: { body: 'beyonder-f', look: 'pink' } };
+const AIR = 0.64; // the engine's time in the air, so the jump clip lands with the runner
 
 const COLORS = { sky: 0x2a1f5c, road: '#1c1836', line: '#f2b134', edge: '#35e0c8', wall: 0xff5a4f, low: 0xf2b134, high: 0x35e0c8, coin: 0xffd24a };
 
@@ -114,6 +121,9 @@ export class RunnerScene {
   private readonly v = new THREE.Vector3();
   private readonly s = new THREE.Vector3(1, 1, 1);
   private anim: Animator | null = null;
+  private me: LoadedAvatar | null = null;
+  private stopChange: (() => void) | null = null;
+  private turn = 0;     // the latest avatar asked for; an older load that finishes later is dropped
   private x = 0;        // the runner's drawn x, eased toward its lane
   private blink = 0;    // seconds of blinking left after a hit
   private spin = 0;
@@ -153,7 +163,7 @@ export class RunnerScene {
     crate.color.set(0xffffff); crate.map = stripeTexture(); crate.emissive.set(0x000000);
     this.scene.add(this.walls, this.lows, this.highs, this.coins, this.towers);
 
-    // The stand-in runs until the bull arrives, so the first frame never waits for the network.
+    // The stand-in runs until the avatar arrives, so the first frame never waits for the network.
     this.standIn = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.9, 6, 12).translate(0, 0.87, 0), new THREE.MeshStandardMaterial({ color: 0xf2b134, roughness: 0.5 }));
     this.runner.add(this.standIn);
     this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.62, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -170,27 +180,54 @@ export class RunnerScene {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Load the bull and its clips. Safe to fail: the stand-in keeps running. */
+  /** Load the player's avatar and its moves. Safe to fail: the stand-in keeps running. */
   async loadCharacter(): Promise<void> {
+    // They saved another look and came back to the running game: swap it in.
+    this.stopChange ??= onPlayerAvatarChange((next) => { void this.show(next); });
     try {
-      const [kit, clips] = await Promise.all([CobiKit.load(KIT_BASE, { tokens: false, kit: 'cobi/v2' }), loadClips('runner')]);
-      const bull = await kit.build(BULL);
-      if (this.disposed) { bull.release(); return; }
-      const air = 0.64; // the engine's time in the air, so the jump clip lands with the runner
-      this.anim = new Animator(bull.root, clips, {
-        run: { clip: 'run' },
-        jump: { clip: 'run-jump', loop: false, fade: 0.1, speed: (clips['run-jump']?.duration ?? air) / (air + 0.1) },
-        slide: { clip: 'run-slide', loop: false, fade: 0.1, speed: (clips['run-slide']?.duration ?? 0.7) / 0.75, then: 'run' },
-        hit: { clip: 'hit-react', loop: false, fade: 0.08, speed: 1.4, then: 'run' },
-        down: { clip: 'knockout', loop: false, fade: 0.12 },
-        win: { clip: 'victory' },
-      });
-      this.anim.play('run');
-      this.runner.remove(this.standIn);
-      this.runner.add(bull.root);
+      await this.show(await loadPlayerAvatar({ fallback: LOCAL }));
     } catch {
       /* offline, or the asset host did not answer: the stand-in stays */
     }
+  }
+
+  /** Put an avatar on the runner: its own run (and jump, fall and victory), and the runner's moves made for the
+   *  bull (run-jump, run-slide, hit-react, knockout) fitted to its body. A body the avatar kit did not build (a
+   *  library character, when the kit fails) plays its own moves only. */
+  private async show(next: LoadedAvatar): Promise<void> {
+    const mine = ++this.turn;
+    let clips: Record<string, THREE.AnimationClip>;
+    try {
+      const [own, pack] = await Promise.all([
+        next.clips(['run', 'jump', 'fall', 'victory']),
+        next.kitAvatar ? loadClips('runner').then((c) => next.kitAvatar!.fit(c)) : Promise.resolve({}),
+      ]);
+      clips = { ...pack, ...own }; // its own run wins over the bull's
+    } catch {
+      next.kitAvatar?.release();
+      return;
+    }
+    if (this.disposed || mine !== this.turn) { next.kitAvatar?.release(); return; }
+    const jump = clips['run-jump'] ? 'run-jump' : 'jump';
+    const anim = new Animator(next.character.root, clips, {
+      run: { clip: 'run' },
+      jump: { clip: jump, loop: false, fade: 0.1, speed: (clips[jump]?.duration ?? AIR) / (AIR + 0.1) },
+      slide: { clip: 'run-slide', loop: false, fade: 0.1, speed: (clips['run-slide']?.duration ?? 0.7) / 0.75, then: 'run' },
+      hit: { clip: clips['hit-react'] ? 'hit-react' : 'fall', loop: false, fade: 0.08, speed: 1.4, then: 'run' },
+      down: { clip: clips.knockout ? 'knockout' : 'fall', loop: false, fade: 0.12 },
+      win: { clip: 'victory' },
+    });
+    const was = this.anim?.state;
+    anim.play(was === 'down' || was === 'win' ? was : 'run');
+    // Swap in one step: nothing renders between taking the old look off and putting the new one on.
+    const old = this.me;
+    this.anim?.dispose();
+    this.runner.remove(this.standIn);
+    if (old) this.runner.remove(old.character.root);
+    this.runner.add(next.character.root);
+    this.anim = anim;
+    this.me = next;
+    old?.kitAvatar?.release();
   }
 
   /** A game event to show: 'jump', 'slide', 'land', 'hit', 'down', 'win', 'run'. */
@@ -281,7 +318,9 @@ export class RunnerScene {
 
   dispose(): void {
     this.disposed = true;
+    this.stopChange?.();
     this.anim?.dispose();
+    this.me?.kitAvatar?.release();
     this.renderer.dispose();
   }
 }
