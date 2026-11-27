@@ -434,9 +434,9 @@ and scenery may be built from shapes. The runner starter (section 5d) already pl
   in it, in seat order, each with the room's `playerId` and `seat` (the ones `match.live.players`
   carries) and `loaded`, the look they chose; in a duel, `await loadOpponentAvatar()` is the opponent's.
   Both are empty or null in a bot match, signed out, outside a published game and when the host does
-  not answer in time: draw those seats your own way, and bots always. Pass `lite: true` for more than
-  two or three at once, and keep inside the budget above (each costs what the hero does). A holder's
-  own token is never another player's traits in your game: it arrives as the platform's bull.
+  not answer in time: draw those seats your own way, and bots always. Each costs what the hero does,
+  so the budget above decides how many to show whole; draw the rest as stand-ins. A holder's own
+  token is never another player's traits in your game: it arrives as the platform's bull.
 
 ### Characters and moves from the library
 

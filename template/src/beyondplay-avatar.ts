@@ -21,7 +21,7 @@
 // Other players: loadRoomAvatars() is everyone else in the live room the game is playing (each their own look, by the
 // room's player id and seat), loadOpponentAvatar() a duel's opponent. Bots are not players: draw them your own way.
 //
-//   const others = await loadRoomAvatars({ lite: true });   // [] in a bot match, signed out, or outside a room
+//   const others = await loadRoomAvatars();   // [] in a bot match, signed out, or outside a room
 //   for (const p of others) seatAt(p.seat).add(p.loaded.character.root);
 //
 // NFT avatars: a holder who chose their own token (a COBI bull) is answered as its collection and traits
@@ -171,7 +171,7 @@ export interface LoadedRoomPlayer {
 export interface LoadOthersOptions {
   /** One kit the game declared; without it, the avatar rule over every kit it declared (each player's own look). */
   kit?: string;
-  /** The characters' lighter copies where the library has them, for many players at once. */
+  /** The library characters' lighter copies where the library has them (a look built in the avatar kit has none). */
   lite?: boolean;
   /** How long to wait for the host (ms); after it, nothing (draw the seats your own way). */
   timeoutMs?: number;
