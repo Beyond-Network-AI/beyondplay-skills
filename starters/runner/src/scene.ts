@@ -3,14 +3,14 @@
 // avatar (src/beyondplay-avatar.ts: the look they chose in the app, a Beyonder,
 // an ape, a bull, a bear or their own COBI bull), loaded from the platform's
 // asset host after the first frame (a stand-in runs until it arrives) and
-// animated through the platform Animator: its own run, and the runner's jump,
-// slide, hit and knockout fitted to its body. The look never changes the run:
-// the engine's lanes and boxes are the same for every avatar.
+// animated through the platform Animator: the runner's sprint, jump, slide,
+// hit and knockout, made for the bull, fitted to its body. The look never
+// changes the run: the engine's lanes and boxes are the same for every avatar.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Animator, loadClips } from './beyondplay-anim';
-import { DEFAULT_AVATAR, loadPlayerAvatar, onPlayerAvatarChange, type LoadedAvatar } from './beyondplay-avatar';
-import type { PlayerAvatar } from './beyondplay-platform';
+import { DEFAULT_AVATAR, loadAvatar, loadPlayerAvatar, type LoadedAvatar } from './beyondplay-avatar';
+import { onAvatarChange, type PlayerAvatar } from './beyondplay-platform';
 import { HIGH, LOW, WALL, type RunnerGame } from './game';
 
 const LANE_W = 2.2;
@@ -123,7 +123,9 @@ export class RunnerScene {
   private anim: Animator | null = null;
   private me: LoadedAvatar | null = null;
   private stopChange: (() => void) | null = null;
-  private turn = 0;     // the latest avatar asked for; an older load that finishes later is dropped
+  private asked = 0;    // tickets, one per look asked for, in the order asked
+  private shown = 0;    // the ticket of the look on screen: an older load that finishes later is dropped
+  private ended: 'down' | 'win' | null = null; // the run is over: a look that arrives now shows the end pose
   private x = 0;        // the runner's drawn x, eased toward its lane
   private blink = 0;    // seconds of blinking left after a hit
   private spin = 0;
@@ -182,32 +184,35 @@ export class RunnerScene {
 
   /** Load the player's avatar and its moves. Safe to fail: the stand-in keeps running. */
   async loadCharacter(): Promise<void> {
-    // They saved another look and came back to the running game: swap it in.
-    this.stopChange ??= onPlayerAvatarChange((next) => { void this.show(next); });
+    // They saved another look and came back to the running game: swap it in. A look takes its ticket when it is
+    // asked for, so a slow first load that finishes late never replaces a newer look.
+    this.stopChange ??= onAvatarChange((avatar) => {
+      if (!avatar) return;
+      const ticket = ++this.asked;
+      void loadAvatar(avatar).then((next) => this.show(next, ticket)).catch(() => {});
+    });
+    const ticket = ++this.asked;
     try {
-      await this.show(await loadPlayerAvatar({ fallback: LOCAL }));
+      await this.show(await loadPlayerAvatar({ fallback: LOCAL }), ticket);
     } catch {
       /* offline, or the asset host did not answer: the stand-in stays */
     }
   }
 
-  /** Put an avatar on the runner: its own run (and jump, fall and victory), and the runner's moves made for the
-   *  bull (run-jump, run-slide, hit-react, knockout) fitted to its body. A body the avatar kit did not build (a
-   *  library character, when the kit fails) plays its own moves only. */
-  private async show(next: LoadedAvatar): Promise<void> {
-    const mine = ++this.turn;
-    let clips: Record<string, THREE.AnimationClip>;
-    try {
-      const [own, pack] = await Promise.all([
-        next.clips(['run', 'jump', 'fall', 'victory']),
-        next.kitAvatar ? loadClips('runner').then((c) => next.kitAvatar!.fit(c)) : Promise.resolve({}),
-      ]);
-      clips = { ...pack, ...own }; // its own run wins over the bull's
-    } catch {
-      next.kitAvatar?.release();
-      return;
-    }
-    if (this.disposed || mine !== this.turn) { next.kitAvatar?.release(); return; }
+  /** Put an avatar on the runner with the runner's moves: the runner pack made for the bull (run, run-jump,
+   *  run-slide, hit-react, knockout, victory) fitted to its body, and its own run, jump, fall and victory where
+   *  the pack is missing. The pack's run is a sprint: a body's own run is a jog, and at the runner's 8 to 14 m/s
+   *  its feet would slide. A body the avatar kit did not build (a library character, when the kit fails) plays
+   *  its own moves only. */
+  private async show(next: LoadedAvatar, ticket: number): Promise<void> {
+    const [own, pack] = await Promise.all([
+      next.clips(['run', 'jump', 'fall', 'victory']).catch(() => ({})),
+      next.kitAvatar ? loadClips('runner').then((c) => next.kitAvatar!.fit(c)).catch(() => ({})) : Promise.resolve({}),
+    ]);
+    const clips: Record<string, THREE.AnimationClip> = { ...own, ...pack };
+    // Keep what is on screen when this look is gone, older than the one shown, or has nothing to run with
+    // (a newer look still loading replaces it when it arrives).
+    if (this.disposed || ticket < this.shown || !clips.run) { next.kitAvatar?.release(); return; }
     const jump = clips['run-jump'] ? 'run-jump' : 'jump';
     const anim = new Animator(next.character.root, clips, {
       run: { clip: 'run' },
@@ -217,8 +222,8 @@ export class RunnerScene {
       down: { clip: clips.knockout ? 'knockout' : 'fall', loop: false, fade: 0.12 },
       win: { clip: 'victory' },
     });
-    const was = this.anim?.state;
-    anim.play(was === 'down' || was === 'win' ? was : 'run');
+    if (this.ended) { anim.play(this.ended); anim.update(5); } // straight to the end pose behind the end card
+    else anim.play('run');
     // Swap in one step: nothing renders between taking the old look off and putting the new one on.
     const old = this.me;
     this.anim?.dispose();
@@ -227,6 +232,7 @@ export class RunnerScene {
     this.runner.add(next.character.root);
     this.anim = anim;
     this.me = next;
+    this.shown = ticket;
     old?.kitAvatar?.release();
   }
 
@@ -234,6 +240,8 @@ export class RunnerScene {
   event(name: 'jump' | 'slide' | 'land' | 'hit' | 'down' | 'win' | 'run'): void {
     if (name === 'hit') this.blink = 1;
     if (name === 'down' || name === 'run') this.blink = 0;
+    if (name === 'down' || name === 'win') this.ended = name;
+    else if (name === 'run') this.ended = null;
     if (!this.anim) return;
     if (name === 'land') { if (this.anim.state === 'jump') this.anim.play('run', { fade: 0.12 }); return; }
     this.anim.play(name, { restart: name === 'jump' || name === 'slide' || name === 'hit' });
