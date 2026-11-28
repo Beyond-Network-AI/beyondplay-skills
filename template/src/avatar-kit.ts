@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  91d2ec14b888f0937958df30a7a639cf0d598cf8
-//   sha256  b7e5d1ce4b6e2eb961fcc3d023d0659e2ca8bd52379e0fd91d87ca62a39c2f78  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  f71dfd538a9945266251365b9a426ad59ebcf6ab
+//   sha256  8bb992f81cb8ed1c3d0b5282a5a42951b0fc5a923f9004a0bfd047cc88524e81  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -47,8 +47,9 @@
 // hash in their name, so a re-cut item reaches every game with no code change.
 // Formats: the catalogue's layout is format AVATAR_FORMAT, and this loader reads that one only. A change older loaders
 // would draw wrongly is a new format at its own address (avatars.v<format>.json), and the platform's answer never hands
-// a game a look in a format newer than the one it reads (`player.avatar` with `format`). Format 1 is also served at the
-// address games published before formats read, manifests/avatars.json, for as long as they are played. Built from the avatar proof
+// a game a look in a format newer than the one it reads (`player.avatar` with `format`). A newer format keeps every
+// older body and look under the same names. Format 1 is also served, the same bytes, at the address every loader from
+// before formats reads, manifests/avatars.json, which stays format 1 for good. Built from the avatar proof
 // (tools/avatar-proof, pack.mjs). One copy: the public creator kit (beyondplay-skills) carries this file as
 // template/src/avatar-kit.ts, synced by its scripts/sync-avatar-kit.mjs.
 import * as THREE from 'three';
@@ -179,7 +180,9 @@ export class AvatarKit {
     this.cobiKit = cobi ? Promise.resolve(cobi) : null;
   }
 
-  /** Reads the catalogue (the asset host's, unless another address is given). */
+  /** Reads the catalogue (the asset host's, unless another address is given). Rejects a catalogue in another format
+   *  (or a failed read): a game calling this directly shows its own fallback, as src/beyondplay-avatar.ts shows the
+   *  library character. */
   static async load(url: string = AVATARS_CATALOGUE, opts: AvatarKitOptions = {}): Promise<AvatarKit> {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`avatar kit: HTTP ${r.status} for ${url}`);

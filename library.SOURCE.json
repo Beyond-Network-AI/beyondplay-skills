@@ -1,6 +1,6 @@
 {
   "source": "Beyond-Network-AI/beyondplay-games",
-  "commit": "91d2ec14b888f0937958df30a7a639cf0d598cf8",
+  "commit": "f71dfd538a9945266251365b9a426ad59ebcf6ab",
   "files": {
     "cobi-kit.ts": {
       "from": "library/characters/cobi.ts",
@@ -12,7 +12,7 @@
     },
     "avatar-kit.ts": {
       "from": "library/characters/avatar-kit.ts",
-      "sha256": "b7e5d1ce4b6e2eb961fcc3d023d0659e2ca8bd52379e0fd91d87ca62a39c2f78"
+      "sha256": "8bb992f81cb8ed1c3d0b5282a5a42951b0fc5a923f9004a0bfd047cc88524e81"
     },
     "crowd-copy.ts": {
       "from": "library/characters/crowd-copy.ts",
