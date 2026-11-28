@@ -34,10 +34,15 @@
 // (`avatar.avatarKit = { collection: 'cobi', traits }`), and built here exactly as minted by the collection's own kit,
 // playing the bull's moves; `character.meta.collection` names it. A game built before the avatar kit, or one where the
 // collectible fails to build, shows the platform's bull the answer also names (`avatar.id`).
+//
+// Versions: every ask carries the avatar catalogue format this game's src/avatar-kit.ts reads (`format`,
+// AVATAR_FORMAT), and the host never names a look in a newer format, so a published game keeps drawing what it can
+// when the avatar standard changes. A look the answer marks newer anyway (`avatarKit.format`) is not built: the game
+// shows the library character `avatar.id` names.
 
 import type * as THREE from 'three';
 
-import { AvatarKit, type Avatar } from './avatar-kit';
+import { AVATAR_FORMAT, AvatarKit, type Avatar } from './avatar-kit';
 import { clipsFor, loadCharacter, openLibrary, type LibraryCharacter } from './beyondplay-characters';
 import { crowdCopyOf, type CrowdMesh } from './crowd-copy';
 import { onAvatarChange, opponentAvatar, request, roomAvatars, type PlayerAvatar, type PlayerAvatarCollectible, type PlayerAvatarLook } from './beyondplay-platform';
@@ -78,7 +83,8 @@ const text = (v: unknown): string | null => (typeof v === 'string' && v ? v : nu
 
 /** The host's player.avatar answer, or null when none comes in time. */
 async function ask(opts: LoadAvatarOptions): Promise<PlayerAvatar | null> {
-  const params = (opts.kit ? { kit: opts.kit } : {}) as { kit: string };
+  // The catalogue format src/avatar-kit.ts reads goes with every ask: the host never names a look in a newer one.
+  const params = { ...(opts.kit ? { kit: opts.kit } : {}), format: AVATAR_FORMAT } as { kit: string; format: number };
   const late = new Promise<null>((resolve) => setTimeout(() => resolve(null), opts.timeoutMs ?? 1500));
   return Promise.race([request('player.avatar', params).catch(() => null), late]);
 }
@@ -114,6 +120,9 @@ function traitsOf(want: PlayerAvatarCollectible): Record<string, string> | null 
 async function fromAvatarKit(avatar: PlayerAvatar): Promise<LoadedAvatar | null> {
   const want = avatar.avatarKit;
   if (!want) return null;
+  // A look in a newer catalogue format than this avatar kit reads would be drawn wrongly: the library character instead.
+  const format = (want as { format?: unknown }).format;
+  if (typeof format === 'number' && format > AVATAR_FORMAT) return null;
   try {
     const avatars = await avatarKit();
     let a: Avatar;
@@ -228,7 +237,7 @@ async function loadOrNull(avatar: PlayerAvatar, opts: { lite?: boolean; crowd?: 
 export async function loadRoomAvatars(opts: LoadOthersOptions & { withYou?: boolean; roomId?: string; max?: number } = {}): Promise<LoadedRoomPlayer[]> {
   const roomId = opts.roomId ?? text(currentMatch()?.live?.roomId);
   if (!roomId) return [];
-  const players = await inTime(roomAvatars(roomId, opts.kit), opts.timeoutMs);
+  const players = await inTime(roomAvatars(roomId, opts.kit, AVATAR_FORMAT), opts.timeoutMs);
   if (!players) return [];
   const wanted = players.filter((p) => opts.withYou || !p.you);
   const loaded = await Promise.all(
@@ -248,6 +257,6 @@ export async function loadRoomAvatars(opts: LoadOthersOptions & { withYou?: bool
 export async function loadOpponentAvatar(opts: LoadOthersOptions & { challengeId?: string } = {}): Promise<LoadedAvatar | null> {
   const challengeId = opts.challengeId ?? text(currentMatch()?.challengeId);
   if (!challengeId) return null;
-  const avatar = await inTime(opponentAvatar(challengeId, opts.kit), opts.timeoutMs);
+  const avatar = await inTime(opponentAvatar(challengeId, opts.kit, AVATAR_FORMAT), opts.timeoutMs);
   return avatar ? loadOrNull(avatar, opts) : null;
 }

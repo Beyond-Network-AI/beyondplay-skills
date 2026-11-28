@@ -1,8 +1,8 @@
 // PLATFORM-OWNED. Do not edit: the validator refuses a game whose copy differs from the template's,
 // and the hosted build keeps the platform's copy anyway.
 // Synced from Beyond-Network-AI/beyondplay-games library/characters/avatar-kit.ts by scripts/sync-avatar-kit.mjs.
-//   commit  506e0f0d26f47088c02da074271d77bb86e3de82
-//   sha256  5daf87fa38a326975c3c0c59253ea820b36efaaf1093f401920a0deeaa8a9fea  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
+//   commit  f71dfd538a9945266251365b9a426ad59ebcf6ab
+//   sha256  8bb992f81cb8ed1c3d0b5282a5a42951b0fc5a923f9004a0bfd047cc88524e81  (of the source file; template/src/avatar-kit.SOURCE.json records the same)
 // To change the loader: edit it in the games repository, commit there, then run
 //   npm run sync-avatar-kit -- <path to that checkout>
 // ---- synced copy: everything below is the games repository's file, its two imports renamed to the template's files ----
@@ -44,7 +44,12 @@
 // game plays any avatar by the same names, and a clip a game makes for the bull plays on every body (`fit`).
 //
 // Files: the catalogue (AVATARS_CATALOGUE, kept a minute on the host) names every file; files carry their content's
-// hash in their name, so a re-cut item reaches every game with no code change. Built from the avatar proof
+// hash in their name, so a re-cut item reaches every game with no code change.
+// Formats: the catalogue's layout is format AVATAR_FORMAT, and this loader reads that one only. A change older loaders
+// would draw wrongly is a new format at its own address (avatars.v<format>.json), and the platform's answer never hands
+// a game a look in a format newer than the one it reads (`player.avatar` with `format`). A newer format keeps every
+// older body and look under the same names. Format 1 is also served, the same bytes, at the address every loader from
+// before formats reads, manifests/avatars.json, which stays format 1 for good. Built from the avatar proof
 // (tools/avatar-proof, pack.mjs). One copy: the public creator kit (beyondplay-skills) carries this file as
 // template/src/avatar-kit.ts, synced by its scripts/sync-avatar-kit.mjs.
 import * as THREE from 'three';
@@ -54,7 +59,13 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { AVATAR_CULL_RADIUS, CobiKit, shareSkeleton, webpBitmapPlugin, type CobiBull, type CobiTraits } from './cobi-kit';
 import { loadClip, loadDance, retargetFrom, type HipsRest } from './beyondplay-characters';
 
-export const AVATARS_CATALOGUE = 'https://assets.beyondplay.xyz/library/manifests/avatars.json';
+/** The catalogue format this loader reads (the catalogue's `version`). */
+export const AVATAR_FORMAT = 1;
+/** Where a format's catalogue is: avatars.v<format>.json beside the creation library's catalogues. */
+export function avatarsCatalogue(format: number = AVATAR_FORMAT): string {
+  return `https://assets.beyondplay.xyz/library/manifests/avatars.v${format}.json`;
+}
+export const AVATARS_CATALOGUE = avatarsCatalogue(AVATAR_FORMAT);
 export const SLOTS = ['top', 'bottom', 'shoes', 'eyes', 'hat'] as const;
 export type Slot = (typeof SLOTS)[number];
 export const POINTS = ['head', 'back', 'rightHand', 'leftHand'] as const;
@@ -108,6 +119,7 @@ export interface AvatarCollection {
   wearables: Record<string, CollectibleWearable>;
 }
 export interface AvatarCatalogue {
+  /** the catalogue's format: AVATAR_FORMAT for this loader */
   version: number;
   /** where the files are: each file name is relative to it */
   base: string;
@@ -168,11 +180,17 @@ export class AvatarKit {
     this.cobiKit = cobi ? Promise.resolve(cobi) : null;
   }
 
-  /** Reads the catalogue (the asset host's, unless another address is given). */
+  /** Reads the catalogue (the asset host's, unless another address is given). Rejects a catalogue in another format
+   *  (or a failed read): a game calling this directly shows its own fallback, as src/beyondplay-avatar.ts shows the
+   *  library character. */
   static async load(url: string = AVATARS_CATALOGUE, opts: AvatarKitOptions = {}): Promise<AvatarKit> {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`avatar kit: HTTP ${r.status} for ${url}`);
     const catalogue = (await r.json()) as AvatarCatalogue;
+    // Another format would be drawn wrongly: refuse it, so the game falls back to the library character instead.
+    if (catalogue?.version !== AVATAR_FORMAT) {
+      throw new Error(`avatar kit: ${url} is format ${String(catalogue?.version)}, this loader reads format ${AVATAR_FORMAT}`);
+    }
     let base = opts.base ?? catalogue.base;
     if (!base.endsWith('/')) base += '/';
     return new AvatarKit(catalogue, base, opts.cobi);

@@ -185,6 +185,9 @@ export interface StoreBuyResult {
 export interface PlayerAvatarParams {
   /** The kit, the one declared in uses as 'player.avatar:<kit>' ('ape'). */
   kit: string;
+  /** The avatar catalogue format the game reads (src/avatar-kit.ts AVATAR_FORMAT; src/beyondplay-avatar.ts sends it):
+   *  the host never names a look in a newer format in `avatarKit`. Absent: 1. */
+  format?: number;
 }
 
 /** The player's avatar: one look, the same in every game. Look only: never how a run plays. */
@@ -214,11 +217,23 @@ export interface PlayerAvatar {
 }
 
 /** A platform look in the avatar kit: the body and the whole look it wears. */
-export interface PlayerAvatarLook { body: string; look: string }
+export interface PlayerAvatarLook {
+  body: string;
+  look: string;
+  /** The avatar catalogue format the look is in (absent: 1). A look in a newer format than the game's avatar kit reads
+   *  is not built: the game shows the library character `id` names instead. */
+  format?: number;
+}
 
 /** A holder's own token in the avatar kit: its collection ('cobi') and its traits as minted (trait type to value), with
  *  the collection's wearables the platform says they own (`wear`, none yet). Never a token id or a wallet. */
-export interface PlayerAvatarCollectible { collection: string; traits: Record<string, string>; wear?: string[] }
+export interface PlayerAvatarCollectible {
+  collection: string;
+  traits: Record<string, string>;
+  wear?: string[];
+  /** The avatar catalogue format it is built in (absent: 1), as for a look. */
+  format?: number;
+}
 
 export interface CapabilityParams {
   capabilities: undefined;
@@ -323,16 +338,17 @@ export interface RoomPlayerAvatar {
 const isAnswer = (v: unknown): v is PlayerAvatar =>
   !!v && typeof v === 'object' && typeof (v as PlayerAvatar).kit === 'string' && typeof (v as PlayerAvatar).id === 'string' && !!(v as PlayerAvatar).look;
 
-/** Asks player.avatar for other players (`{ room }` or `{ challenge }`), with the game's kit when given. */
-function askOthers(params: { room: string } | { challenge: string }, kit?: string): Promise<unknown> {
-  return request('player.avatar', { ...params, ...(kit ? { kit } : {}) } as unknown as PlayerAvatarParams) as Promise<unknown>;
+/** Asks player.avatar for other players (`{ room }` or `{ challenge }`), with the game's kit and the avatar catalogue
+ *  format it reads when given. */
+function askOthers(params: { room: string } | { challenge: string }, kit?: string, format?: number): Promise<unknown> {
+  return request('player.avatar', { ...params, ...(kit ? { kit } : {}), ...(format ? { format } : {}) } as unknown as PlayerAvatarParams) as Promise<unknown>;
 }
 
 /** Everyone in the live room the game is in (`match.live.roomId`), in seat order, over the kits the game declared
  *  (`kit`: one of them). Signed in only: null outside the room, signed out, from a host that predates it, or with no
  *  room (a bot match). Rejects like request() (denied for a kit the game did not declare). */
-export async function roomAvatars(roomId: string, kit?: string): Promise<RoomPlayerAvatar[] | null> {
-  const result = (await askOthers({ room: roomId }, kit)) as { players?: unknown } | null;
+export async function roomAvatars(roomId: string, kit?: string, format?: number): Promise<RoomPlayerAvatar[] | null> {
+  const result = (await askOthers({ room: roomId }, kit, format)) as { players?: unknown } | null;
   if (!result || !Array.isArray(result.players)) return null;
   return (result.players as RoomPlayerAvatar[]).filter(
     (p) => !!p && typeof p.playerId === 'string' && typeof p.seat === 'number' && isAnswer(p.avatar),
@@ -342,8 +358,8 @@ export async function roomAvatars(roomId: string, kit?: string): Promise<RoomPla
 /** A duel's opponent (`match.challengeId`) over the kits the game declared, once both players accepted the duel (and
  *  after it ends): null before then, outside the duel, signed out, or from a host that predates it. Always a platform
  *  look (a holder's own token arrives as the platform's bull). */
-export async function opponentAvatar(challengeId: string, kit?: string): Promise<PlayerAvatar | null> {
-  const result = (await askOthers({ challenge: challengeId }, kit)) as { opponent?: unknown } | null;
+export async function opponentAvatar(challengeId: string, kit?: string, format?: number): Promise<PlayerAvatar | null> {
+  const result = (await askOthers({ challenge: challengeId }, kit, format)) as { opponent?: unknown } | null;
   return result && isAnswer(result.opponent) ? result.opponent : null;
 }
 
