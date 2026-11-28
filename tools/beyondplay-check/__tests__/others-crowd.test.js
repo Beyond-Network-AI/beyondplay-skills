@@ -11,7 +11,8 @@ const h = vi.hoisted(() => ({
   opponent: null,
 }));
 
-vi.mock('../../../template/src/avatar-kit.ts', () => ({ AvatarKit: { load: vi.fn(async () => { throw new Error('no avatar kit in this test'); }) } }));
+vi.mock('../../../template/src/avatar-kit.ts', () => ({
+  AVATAR_FORMAT: 1, AvatarKit: { load: vi.fn(async () => { throw new Error('no avatar kit in this test'); }) } }));
 vi.mock('../../../template/src/beyondplay-characters.ts', () => ({
   loadCharacter: vi.fn(async (id) => ({ id, root: { name: `root:${id}` }, bones: {}, meta: { character: id } })),
   clipsFor: vi.fn(async () => ({})),

@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../template/src/avatar-kit.ts', () => ({
+  AVATAR_FORMAT: 1,
   AvatarKit: {
     load: vi.fn(async () => ({
       build: vi.fn(async (spec) => {
